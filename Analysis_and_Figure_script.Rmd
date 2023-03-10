@@ -1,0 +1,1917 @@
+---
+title: "PaperSubmission_Analysis_&_Figure_script"
+author: "Ryan Calhoun"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+### *Libraries*
+```{r setup, include=T}
+library(Seurat)
+library(scDblFinder)
+library(dittoSeq)
+library(pheatmap)
+library(gprofiler2)
+
+library(tximport)
+library(AnnotationHub)
+library(edgeR)
+library(AnnotationDbi)
+
+library(RColorBrewer)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+```
+
+###Processing Single Cell Dataset
+```{r eval=FALSE, include=FALSE}
+
+s.genes <- gorth(query = cc.genes.updated.2019$s.genes, source_organism = 'hsapiens', target_organism = 'mmusculus')[,5]
+g2m.genes <- gorth(query = cc.genes.updated.2019$g2m.genes, source_organism = 'hsapiens', target_organism = 'mmusculus')[,5]
+
+#YTN -v1 Cutoffs
+# Load the Filtered dataset and make percent mito, filter mito @10, nfeature @ 800 and 6000, variable features @ 6000 
+YTN.counts<- Read10X(data.dir = "/home/coreyh/Documents/COREY/CDH014/PatrickSeale_SCv3_10-3-19_dataRelease/1_YTN_7514051904/outs/filtered_feature_bc_matrix/")
+YTN <- CreateSeuratObject(counts = YTN.counts, project = "YTN", min.cells = 3, min.features = 200) %>% 
+  PercentageFeatureSet( , pattern = "^mt-",col.name = "percent.mt") %>% 
+  subset( , subset = percent.mt < 10) %>% 
+  subset( , subset = nFeature_RNA > 800 & nFeature_RNA < 6000) %>% 
+  NormalizeData(, normalization.method = "LogNormalize", scale.factor = 10000) %>%
+  FindVariableFeatures(, selection.method = "vst", nfeatures = 6000) %>%
+  CellCycleScoring(, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+#Y3D -v1 Cutoffs
+# Load the Filtered dataset and make percent mito, filter mito @7.5, nfeature @ 900 and 5500, variable features @ 5000 
+Y3D.counts <- Read10X(data.dir = "/home/coreyh/Documents/COREY/CDH014/PatrickSeale_SCv3_10-3-19_dataRelease/2_Y3D_2797156080/outs/filtered_feature_bc_matrix/")
+Y3D <- CreateSeuratObject(counts = Y3D.counts, project = "Y3D", min.cells = 3, min.features = 200) %>% PercentageFeatureSet(, pattern = "^mt-",col.name = "percent.mt") %>% subset(, subset = percent.mt < 7.5) %>% subset( , subset = nFeature_RNA > 900 & nFeature_RNA < 5500) %>% NormalizeData(, normalization.method = "LogNormalize", scale.factor = 10000) %>% FindVariableFeatures(, selection.method = "vst", nfeatures = 5500) %>% CellCycleScoring(, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+
+#Y14D -v1 Cutoffs
+# Load the Filtered dataset and make percent mito, filter mito @7.5, nfeature @ 700  and 5250 , variable features @  5250 (The original file did 5500 but I set it to 5250 since we hvae been using the feature max as the variable feature max cutoff)
+Y14D.counts <- Read10X(data.dir = "/home/coreyh/Documents/COREY/CDH014/PatrickSeale_SCv3_10-3-19_dataRelease/3_Y14D_1191979282/outs/filtered_feature_bc_matrix/")
+Y14D <- CreateSeuratObject(counts = Y14D.counts, project = "Y14D", min.cells = 3, min.features = 200) %>% PercentageFeatureSet(, pattern = "^mt-",col.name = "percent.mt") %>% subset(, subset = percent.mt < 7.5) %>% subset( , subset = nFeature_RNA > 700 & nFeature_RNA < 5250) %>% NormalizeData(, normalization.method = "LogNormalize", scale.factor = 10000) %>% FindVariableFeatures(, selection.method = "vst", nfeatures = 5250) %>% CellCycleScoring(, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+
+
+#OldTN- v2 Cutoffs
+# Load the Filtered dataset and make percent mito, filter mito @15, nfeature @ 700 and 5100, variable features @ 5100 
+OTN.counts <- Read10X(data.dir = "/home/coreyh/Documents/COREY/CDH014/PatrickSeale_SCv3_10-3-19_dataRelease/4_OTN_4579565179/outs/filtered_feature_bc_matrix")
+OTN <- CreateSeuratObject(counts = OTN.counts, project = "OTN", min.cells = 3, min.features = 200) %>% PercentageFeatureSet(, pattern = "^mt-",col.name = "percent.mt") %>% subset(, subset = percent.mt < 15) %>% subset( , subset = nFeature_RNA > 700 & nFeature_RNA < 5100) %>% NormalizeData(, normalization.method = "LogNormalize", scale.factor = 10000) %>% FindVariableFeatures(, selection.method = "vst", nfeatures = 5100) %>% CellCycleScoring(, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+
+
+#Old3D- v2 Cutoffs
+# Load the Filtered dataset and make percent mito, filter mito @9.5, nfeature @ 650 and 4900, variable features @ 5100 
+O3D.counts <- Read10X(data.dir = "/home/coreyh/Documents/COREY/CDH014/PatrickSeale_SCv3_10-3-19_dataRelease/5_O3D_2465852674/outs/filtered_feature_bc_matrix")
+O3D <- CreateSeuratObject(counts = O3D.counts, project = "O3D", min.cells = 3, min.features = 200) %>% PercentageFeatureSet(, pattern = "^mt-",col.name = "percent.mt") %>% subset( , subset = percent.mt < 9.5) %>% subset( , subset = nFeature_RNA > 650 & nFeature_RNA < 4900) %>% NormalizeData( , normalization.method = "LogNormalize", scale.factor = 10000) %>% FindVariableFeatures(, selection.method = "vst", nfeatures = 4900) %>% CellCycleScoring( , s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+
+
+#Old14D- v3 Cutoffs - Use the Upper dataset for this (bottom cutoff is 1750)
+# Load the Filtered dataset and make percent mito, filter mito @10, nfeature @ 1750 and 5500, variable features @ 5500 
+O14D.counts <- Read10X(data.dir = "/home/coreyh/Documents/COREY/CDH014/PatrickSeale_SCv3_10-3-19_dataRelease/6_O14D_4777816243/outs/filtered_feature_bc_matrix/")
+O14D <- CreateSeuratObject(counts = O14D.counts, project = "O14D", min.cells = 3, min.features = 200) %>% PercentageFeatureSet(, pattern = "^mt-",col.name = "percent.mt") %>% subset( , subset = percent.mt < 10) %>% subset( , subset = nFeature_RNA > 1750 & nFeature_RNA < 5500) %>% NormalizeData(, normalization.method = "LogNormalize", scale.factor = 10000) %>% FindVariableFeatures( , selection.method = "vst", nfeatures = 5500) %>% CellCycleScoring(, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+
+rm(YTN.counts,Y3D.counts,Y14D.counts,OTN.counts,O3D.counts,O14D.counts)
+
+#Now do the integration
+#From the documentation. https://satijalab.org/seurat/v3.0/integration.html
+#We then pass these anchors to the IntegrateData function, which returns a Seurat object.
+#The returned object will contain a new Assay, which holds an integrated (or ‘batch-corrected’) expression matrix for all cells, enabling them to be jointly analyzed.
+reference.list.all <- c(YTN,Y3D,Y14D,OTN,O3D,O14D)
+IWAT.anchors <- FindIntegrationAnchors(object.list = reference.list.all, dims = 1:30)
+
+#Now that we found the anchors, integrate the data.
+rm(YTN,Y3D,Y14D,OTN,O3D,O14D)
+IWAT.Integrated<-IntegrateData(anchorset = IWAT.anchors, dims = 1:30)
+
+#ScaleData - this is where we are doing all of the cc and mito regressing. I think this should work. As of 11/1/19 the regression variables are scored on each dataset individually (see above code). 
+DefaultAssay(IWAT.Integrated) <- "integrated"
+IWAT.Integrated_Scaled <- ScaleData(IWAT.Integrated, vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"), verbose = FALSE)
+
+#Decided to go with resolution of 0.36 for this dataset based on the tests below
+IWAT.Integrated_Scaled2 <- IWAT.Integrated_Scaled %>%
+  RunPCA() %>%
+  RunUMAP(dims = 1:15, reduction = "pca", seed.use = 2) %>%
+  FindNeighbors(dims = 1:15, reduction = "pca") %>%
+  FindClusters(resolution = c(0.13))
+
+DimPlot(IWAT.Integrated_Scaled2, label = T, pt.size = 0.1, reduction = "umap")
+DimPlot(IWAT.Integrated_Scaled2, label = T, pt.size = 0.1, reduction = "umap", split.by = "seurat_clusters", ncol = 3)
+
+IWAT.Integrated_Scaled2$orig.ident <- IWAT.Integrated_Scaled2$old.ident %>% gsub(pattern = "O", replacement = "A")
+
+#Changing order of levels so that the graphs have samples in correct orders
+IWAT.Integrated_Scaled2$orig.ident <- factor(x = IWAT.Integrated_Scaled2$orig.ident, 
+                                         levels = c("YTN", "Y3D", "Y14D",
+                                                    "ATN", "A3D", "A14D"))
+#Renaming the names from previous column to new column
+IWAT.Integrated_Scaled2@meta.data$age <- IWAT.Integrated_Scaled2@meta.data$orig.ident %>%
+  gsub(pattern = "YTN", replacement = "Young") %>%
+  gsub(pattern = "Y3D", replacement = "Young") %>%
+  gsub(pattern = "Y14D", replacement = "Young") %>%
+  gsub(pattern = "ATN", replacement = "Aged") %>%
+  gsub(pattern = "A3D", replacement = "Aged") %>%
+  gsub(pattern = "A14D", replacement = "Aged") 
+
+IWAT.Integrated_Scaled2$Age <- factor(x = IWAT.Integrated_Scaled2$age, 
+                                  levels = c("Young", "Aged"))
+
+Idents(IWAT.Integrated_Scaled2)<-IWAT.Integrated_Scaled2$seurat_clusters
+table(IWAT.Integrated_Scaled2$seurat_clusters)
+IWAT.Integrated_Scaled2 <- RenameIdents(object = IWAT.Integrated_Scaled2,
+                                  "0" = "Dpp4+ Fibroblasts",
+                                  "1" = "Icam1+ Preadipocytes",
+                                  "2" = "Endothelial 1",
+                                  "3" = "Cd142+ Fibroblasts",
+                                  "4" = "SMCs/Pericytes",
+                                  "5" = "Endothelial 2",
+                                  "6" = "Immune cells",
+                                  "7" = "Spp1+ Fibroblasts",
+                                  "8" = "Dpp4+ Fibroblasts",
+                                  "9" = "Schwann cells")
+
+IWAT.Integrated_Scaled2$Named_clusters <- Idents(IWAT.Integrated_Scaled2)
+#Changing order of levels so that the graphs have samples in correct orders
+IWAT.Integrated_Scaled2$Named_clusters <- factor(x = IWAT.Integrated_Scaled2$Named_clusters, 
+                                             levels = c("Dpp4+ Fibroblasts",
+                                                        "Icam1+ Preadipocytes",
+                                                        "Cd142+ Fibroblasts",
+                                                        "Spp1+ Fibroblasts",
+                                                        "Endothelial 1",
+                                                        "Endothelial 2",
+                                                        "SMCs/Pericytes",
+                                                        "Schwann cells",
+                                                        "Immune cells"))
+
+IWAT.Integrated_Scaled2@meta.data$Exposure_Days <- IWAT.Integrated_Scaled2@meta.data$orig.ident %>%
+  gsub(pattern = "YTN", replacement = "0 Days") %>%
+  gsub(pattern = "ATN", replacement = "0 Days") %>%
+  gsub(pattern = "Y3D", replacement = "3 Days") %>%
+  gsub(pattern = "A3D", replacement = "3 Days") %>%
+  gsub(pattern = "Y14D", replacement = "14 Days") %>%
+  gsub(pattern = "A14D", replacement = "14 Days")
+
+IWAT.Integrated_Scaled2$Exposure_Days <- factor(x = IWAT.Integrated_Scaled2$Exposure_Days, 
+                                             levels = c("0 Days",
+                                                        "3 Days",
+                                                        "14 Days"))
+
+IWAT.Integrated_Scaled2$Condition <- IWAT.Integrated_Scaled2$Exposure_Days %>% 
+  gsub(pattern = "0 Days", replacement = "TN") %>%
+  gsub(pattern = "3 Days", replacement = "3 Days") %>%
+  gsub(pattern = "14 Days", replacement = "14 Days")
+
+IWAT.Integrated_Scaled2$Condition <- factor(x = IWAT.Integrated_Scaled2$Condition, 
+                                             levels = c("TN",
+                                                        "3 Days",
+                                                        "14 Days"))
+
+DimPlot(IWAT.Integrated_Scaled2, reduction = "umap", split.by = "Named_clusters",  label=FALSE, ncol = 3, pt.size = 0.1)
+
+```
+
+###Processing Single Nuclei Dataset - CCA
+```{r eval=FALSE, include=FALSE}
+#Single Nuclei Analysis From Beginning Raw R Objects
+#set seed for reproducibility
+set.seed(57)
+
+setwd("~/Documents/RYAN/Corey_Holman_Paper_Submission_Fall_2022/PaperSubmission/single_nuclei_objects/SingleNucleiRawData/")
+
+#Reading in each dataset, they are hastagged into two groups such as: 
+#Merging together Mm_ING_TN_old_01-1G with Mm_ING_TN_old_01-1H
+#Merging together Mm_ING_TN_old_04-1G with Mm_ING_TN_old_04-1G
+#So the above would be both TN old and hashtagged barcodes for run 1 and run 2
+
+Cold_3DO_13_1I <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_old_13-1I/", gene.column = 1, cell.column = 1)
+Cold_3DO_13_1J <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_old_13-1J/", gene.column = 1, cell.column = 1)
+Cold_3DO_14_1K <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_old_14-1K/", gene.column = 1, cell.column = 1)
+Cold_3DO_14_1L <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_old_14-1L/", gene.column = 1, cell.column = 1)
+
+Cold_3DY_12_1C <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_young_12-1C/", gene.column = 1, cell.column = 1)
+Cold_3DY_12_1D <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_young_12-1D/", gene.column = 1, cell.column = 1)
+Cold_3DY_16_1C <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_young_16-1C/", gene.column = 1, cell.column = 1)
+Cold_3DY_16_1D <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-03d_young_16-1D/", gene.column = 1, cell.column = 1)
+
+Cold14DO_06_1M <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_old_06-1M/", gene.column = 1, cell.column = 1)
+Cold14DO_06_1N <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_old_06-1N/", gene.column = 1, cell.column = 1)
+Cold14DO_08_1K <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_old_08-1K/", gene.column = 1, cell.column = 1)
+Cold14DO_08_1L <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_old_08-1L/", gene.column = 1, cell.column = 1)
+
+Cold14DY_08_1E <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_young_08-1E/", gene.column = 1, cell.column = 1)
+Cold14DY_08_1F <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_young_08-1F/", gene.column = 1, cell.column = 1)
+Cold14DY_10_1E <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_young_10-1E/", gene.column = 1, cell.column = 1)
+Cold14DY_10_1F <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_cold-14d_young_10-1F/", gene.column = 1, cell.column = 1)
+
+TN_O_01_1G <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_old_01-1G/", gene.column = 1, cell.column = 1)
+TN_O_01_1H <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_old_01-1H/", gene.column = 1, cell.column = 1)
+TN_O_04_1G <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_old_04-1G/", gene.column = 1, cell.column = 1)
+TN_O_04_1H <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_old_04-1H/", gene.column = 1, cell.column = 1)
+
+TN_Y_03_1A <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_young_03-1A/", gene.column = 1, cell.column = 1)
+TN_Y_03_1B <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_young_03-1B/", gene.column = 1, cell.column = 1)
+TN_Y_05_1A <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_young_05-1A/", gene.column = 1, cell.column = 1)
+TN_Y_05_1B <- Read10X(data.dir =  "Chromium-SC3Pv3/Mm_ING_TN_young_05-1B/", gene.column = 1, cell.column = 1)
+
+
+#Function to merge together the samples much faster
+merge.matrices <- function (x,y) {
+  xy.names <- union(row.names(x),row.names(y))
+  missing.x <- setdiff(row.names(y),row.names(x))
+  x <- rbind(x,`row.names<-`(matrix(0,nrow = length(missing.x),ncol = ncol(x)),missing.x))
+  missing.y <- setdiff(row.names(x),row.names(y))
+  y <- rbind(y,`row.names<-`(matrix(0,nrow = length(missing.y),ncol = ncol(y)),missing.y))
+  return(cbind2(x[xy.names,],y[xy.names,]))
+}
+
+
+#Merging the hastag runs together
+Cold_3DO_13 <- merge.matrices(x = Cold_3DO_13_1I, y = Cold_3DO_13_1J)
+Cold_3DO_14 <- merge.matrices(x = Cold_3DO_14_1K, y = Cold_3DO_14_1L)
+
+Cold_3DY_12 <- merge.matrices(x = Cold_3DY_12_1C, y = Cold_3DY_12_1D)
+Cold_3DY_16 <- merge.matrices(x = Cold_3DY_16_1C, y = Cold_3DY_16_1D)
+
+Cold14DO_06 <- merge.matrices(x = Cold14DO_06_1M, y = Cold14DO_06_1N)
+Cold14DO_08 <- merge.matrices(x = Cold14DO_08_1K, y = Cold14DO_08_1L)
+
+Cold14DY_08 <- merge.matrices(x = Cold14DY_08_1E, y = Cold14DY_08_1F)
+Cold14DY_10 <- merge.matrices(x = Cold14DY_10_1E, y = Cold14DY_10_1F)
+
+TN_O_01 <- merge.matrices(x = TN_O_01_1G, y = TN_O_01_1H)
+TN_O_04 <- merge.matrices(x = TN_O_04_1G, y = TN_O_04_1H)
+
+TN_Y_03 <- merge.matrices(x = TN_Y_03_1A, y = TN_Y_03_1B)
+TN_Y_05 <- merge.matrices(x = TN_Y_05_1A, y = TN_Y_05_1B)
+
+rm(Cold14DO_06_1M,Cold14DO_06_1N,Cold14DO_08_1K,Cold14DO_08_1L,Cold14DY_08_1E,Cold14DY_08_1F,Cold14DY_10_1E,Cold14DY_10_1F,Cold_3DO_13_1I,Cold_3DO_13_1J,Cold_3DO_14_1K,Cold_3DO_14_1L,Cold_3DY_12_1C,Cold_3DY_12_1D,Cold_3DY_16_1C,Cold_3DY_16_1D,TN_O_01_1G,TN_O_01_1H,TN_O_04_1G,TN_O_04_1H,TN_Y_03_1A,TN_Y_03_1B,TN_Y_05_1A,TN_Y_05_1B)
+
+#Meta Data Information
+Barcodes <- colnames(x = TN_O_01)
+Sample <- 'Mm_ING_TN_old_01-1'
+Age <- 'Old'
+Dataset <- 'Batch_1'
+Temperature <- 'Thermoneutral'
+Exposure_Days <- '0_Days'
+Exposure <- 'Thermoneutral'
+Abbrev <- "OTN"
+
+df1 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df1 <- column_to_rownames(df1, var = "Barcodes")
+samp_0old_tn_1 <- CreateSeuratObject(counts = TN_O_01, project = "OTN_1", assay = "RNA", meta.data = df1, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(x = Cold_3DO_13)
+Sample <- 'Mm_ING_cold-03d_old_13-1'
+Age <- 'Old'
+Dataset <- 'Batch_1'
+Temperature <- 'Cold'
+Exposure_Days <- '3_Days'
+Exposure <- 'Acute_Cold'
+Abbrev <- "O3D"
+
+df2 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df2 <- column_to_rownames(df2, var = "Barcodes")
+samp_3old_cold_1 <- CreateSeuratObject(counts = Cold_3DO_13, project = "O3D_1", assay = "RNA", meta.data = df2, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(Cold14DO_08)
+Sample <- 'Mm_ING_cold-14d_old_08-1'
+Age <- 'Old'
+Dataset <- 'Batch_1'
+Temperature <- 'Cold'
+Exposure_Days <- '14_Days'
+Exposure <- 'Chronic_Cold'
+Abbrev <- "O14D"
+
+df3 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df3 <- column_to_rownames(df3, var = "Barcodes")
+samp_14old_cold_1 <- CreateSeuratObject(counts = Cold14DO_08, project = "O14D_1", assay = "RNA", meta.data = df3, min.cells = 3, min.features = 100)
+
+
+
+Barcodes <- colnames(TN_Y_03)
+Sample <- 'Mm_ING_TN_young_03-1'
+Age <- 'Young'
+Dataset <- 'Batch_1'
+Temperature <- 'Thermoneutral'
+Exposure_Days <- '0_Days'
+Exposure <- 'Thermoneutral' 
+Abbrev <- "YTN"
+
+df4 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df4 <- column_to_rownames(df4, var = "Barcodes")
+samp_0yng_tn_1 <- CreateSeuratObject(counts = TN_Y_03, project = "YTN_1", assay = "RNA", meta.data = df4, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(Cold_3DY_16)
+Sample <- 'Mm_ING_cold-03d_young_16-1'
+Age <- 'Young'
+Dataset <- 'Batch_1'
+Temperature <- 'Cold'
+Exposure_Days <- '3_Days'
+Exposure <- 'Acute_Cold'
+Abbrev <- "Y3D"
+
+df5 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df5 <- column_to_rownames(df5, var = "Barcodes")
+samp_3yng_cold_1 <- CreateSeuratObject(counts = Cold_3DY_16, project = "Y3D_1", assay = "RNA", meta.data = df5, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(Cold14DO_08)
+Sample <- 'Mm_ING_cold-14d_young_08-1'
+Age <- 'Young'
+Dataset <- 'Batch_1'
+Temperature <- 'Cold'
+Exposure_Days <- '14_Days'
+Exposure <- 'Chronic_Cold'
+Abbrev <- "Y14D"
+
+df6 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df6 <- column_to_rownames(df6, var = "Barcodes")
+samp_14yng_cold_1 <- CreateSeuratObject(counts = Cold14DO_08, project = "Y14D_1", assay = "RNA", meta.data = df6, min.cells = 3, min.features = 100)
+
+rm(df1, df2, df3, df4, df5, df6)
+
+#Making a new dataframe called metadata to add for each of these objects
+Barcodes <- colnames(TN_O_04)
+Sample <- 'Mm_ING_TN_old_04-1'
+Age <- 'Old'
+Dataset <- 'Batch_2'
+Temperature <- 'Thermoneutral'
+Exposure_Days <- '0_Days'
+Exposure <- 'Thermoneutral' 
+Abbrev <- "OTN"
+
+df1 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df1 <- column_to_rownames(df1, var = "Barcodes")
+samp_0old_tn_2 <- CreateSeuratObject(counts = TN_O_04, project = "OTN_2", assay = "RNA", meta.data = df1, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(Cold_3DO_14)
+Sample <- 'Mm_ING_cold-03d_old_14-1'
+Age <- 'Old'
+Dataset <- 'Batch_2'
+Temperature <- 'Cold'
+Exposure_Days <- '3_Days'
+Exposure <- 'Acute_Cold'
+Abbrev <- "O3D"
+
+df2 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df2 <- column_to_rownames(df2, var = "Barcodes")
+samp_3old_cold_2 <- CreateSeuratObject(counts = Cold_3DO_14, project = "O3D_2", assay = "RNA", meta.data = df2, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(Cold14DO_06)
+Sample <- 'Mm_ING_cold-14d_old_06-1'
+Age <- 'Old'
+Dataset <- 'Batch_2'
+Temperature <- 'Cold'
+Exposure_Days <- '14_Days'
+Exposure <- 'Chronic_Cold'
+Abbrev <- "O14D"
+
+df3 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df3 <- column_to_rownames(df3, var = "Barcodes")
+samp_14old_cold_2 <- CreateSeuratObject(counts = Cold14DO_06, project = "O14D_2", assay = "RNA", meta.data = df3, min.cells = 3, min.features = 100)
+
+
+
+Barcodes <- colnames(TN_Y_05)
+Sample <- 'Mm_ING_TN_young_05-1'
+Age <- 'Young'
+Dataset <- 'Batch_2'
+Temperature <- 'Thermoneutral'
+Exposure_Days <- '0_Days'
+Exposure <- 'Thermoneutral' 
+Abbrev <- "YTN"
+
+df4 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df4 <- column_to_rownames(df4, var = "Barcodes")
+samp_0yng_tn_2 <- CreateSeuratObject(counts = TN_Y_05, project = "YTN_2", assay = "RNA", meta.data = df4, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(Cold_3DY_12)
+Sample <- 'Mm_ING_cold-03d_young_12-1'
+Age <- 'Young'
+Dataset <- 'Batch_2'
+Temperature <- 'Cold'
+Exposure_Days <- '3_Days'
+Exposure <- 'Acute_Cold'
+Abbrev <- "Y3D"
+
+df5 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df5 <- column_to_rownames(df5, var = "Barcodes")
+samp_3yng_cold_2 <- CreateSeuratObject(counts = Cold_3DY_12, project = "Y3D_2", assay = "RNA", meta.data = df5, min.cells = 3, min.features = 100)
+
+
+Barcodes <- colnames(Cold14DY_10)
+Sample <- 'Mm_ING_cold-14d_young_10-1'
+Age <- 'Young'
+Dataset <- 'Batch_2'
+Temperature <- 'Cold'
+Exposure_Days <- '14_Days'
+Exposure <- 'Chronic_Cold'
+Abbrev <- "Y14D"
+
+df6 <- data.frame(Sample, Barcodes, Age, Dataset, Temperature, Exposure_Days, Exposure, Abbrev)
+df6 <- column_to_rownames(df6, var = "Barcodes")
+samp_14yng_cold_2 <- CreateSeuratObject(counts = Cold14DY_10, project = "Y14D_2", assay = "RNA", meta.data = df6, min.cells = 3, min.features = 100)
+
+rm(df1, df2, df3, df4, df5, df6, Cold14DO_06, Cold14DO_08, Cold14DY_08, Cold14DY_10, Cold_3DO_13, Cold_3DO_14, Cold_3DY_12, Cold_3DY_16, TN_O_01, TN_O_04, TN_Y_03, TN_Y_05)
+
+#Combining datasets together to just pass some percentage feature sets and subset them all
+samp_0old_tn_1 <- PercentageFeatureSet(object = samp_0old_tn_1, pattern = "^mt-", col.name = "mt.percent")
+samp_0old_tn_2 <- PercentageFeatureSet(object = samp_0old_tn_2, pattern = "^mt-", col.name = "mt.percent")
+samp_0yng_tn_1 <- PercentageFeatureSet(object = samp_0yng_tn_1, pattern = "^mt-", col.name = "mt.percent")
+samp_0yng_tn_2 <- PercentageFeatureSet(object = samp_0yng_tn_2, pattern = "^mt-", col.name = "mt.percent")
+samp_3old_cold_1 <- PercentageFeatureSet(object = samp_3old_cold_1, pattern = "^mt-", col.name = "mt.percent")
+samp_3old_cold_2 <- PercentageFeatureSet(object = samp_3old_cold_2, pattern = "^mt-", col.name = "mt.percent")
+samp_3yng_cold_1 <- PercentageFeatureSet(object = samp_3yng_cold_1, pattern = "^mt-", col.name = "mt.percent")
+samp_3yng_cold_2 <- PercentageFeatureSet(object = samp_3yng_cold_2, pattern = "^mt-", col.name = "mt.percent")
+samp_14old_cold_1 <- PercentageFeatureSet(object = samp_14old_cold_1, pattern = "^mt-", col.name = "mt.percent")
+samp_14old_cold_2 <- PercentageFeatureSet(object = samp_14old_cold_2, pattern = "^mt-", col.name = "mt.percent")
+samp_14yng_cold_1 <- PercentageFeatureSet(object = samp_14yng_cold_1, pattern = "^mt-", col.name = "mt.percent")
+samp_14yng_cold_2 <- PercentageFeatureSet(object = samp_14yng_cold_2, pattern = "^mt-", col.name = "mt.percent")
+
+samp_0old_tn_1 <- samp_0old_tn_1 %>% subset(nCount_RNA < 4000 & nCount_RNA > 350) %>% subset(nFeature_RNA < 2000 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+samp_0old_tn_2 <- samp_0old_tn_2 %>% subset(nCount_RNA < 4000 & nCount_RNA > 350) %>% subset(nFeature_RNA < 2000 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+
+samp_0yng_tn_1 <- samp_0yng_tn_1 %>% subset(nCount_RNA < 2000 & nCount_RNA > 350) %>% subset(nFeature_RNA < 1200 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+samp_0yng_tn_2 <- samp_0yng_tn_2 %>% subset(nCount_RNA < 2000 & nCount_RNA > 350) %>% subset(nFeature_RNA < 1200 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+
+samp_3old_cold_1 <- samp_3old_cold_1 %>% subset(nCount_RNA < 5500 & nCount_RNA > 350) %>% subset(nFeature_RNA < 2300 & nFeature_RNA > 375) %>% subset(mt.percent <= 5)
+samp_3old_cold_2 <- samp_3old_cold_2 %>% subset(nCount_RNA < 5500 & nCount_RNA > 350) %>% subset(nFeature_RNA < 2300 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+
+samp_3yng_cold_1 <- samp_3yng_cold_1 %>% subset(nCount_RNA < 4250 & nCount_RNA > 350) %>% subset(nFeature_RNA < 2000 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+samp_3yng_cold_2 <- samp_3yng_cold_2 %>% subset(nCount_RNA < 4250 & nCount_RNA > 350) %>% subset(nFeature_RNA < 2000 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+
+samp_14old_cold_1 <- samp_14old_cold_1 %>% subset(nCount_RNA < 8000 & nCount_RNA > 350) %>% subset(nFeature_RNA < 3000 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+samp_14old_cold_2 <- samp_14old_cold_2 %>% subset(nCount_RNA < 6000 & nCount_RNA > 350) %>% subset(nFeature_RNA < 3000 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+
+samp_14yng_cold_1 <- samp_14yng_cold_1 %>% subset(nCount_RNA < 8000 & nCount_RNA > 350) %>% subset(nFeature_RNA < 3000 & nFeature_RNA > 350) %>% subset(mt.percent <= 5)
+samp_14yng_cold_2 <- samp_14yng_cold_2 %>% subset(nCount_RNA < 8000 & nCount_RNA > 500) %>% subset(nFeature_RNA < 3000 & nFeature_RNA > 500) %>% subset(mt.percent <= 5)
+
+MergedData <- merge(x = samp_0old_tn_1, y =  c(samp_0yng_tn_1, samp_3old_cold_1,
+                                              samp_3yng_cold_1, samp_14yng_cold_1,
+                                               samp_14old_cold_1,
+                                               samp_0old_tn_2, samp_0yng_tn_2,
+                                               samp_14yng_cold_2, samp_14old_cold_2,
+                                               samp_3yng_cold_2, samp_3old_cold_2))
+
+VlnPlot(MergedData, features = c("nCount_RNA", "nFeature_RNA", "mt.percent"), pt.size = 0)
+
+Data <- list(samp_0old_tn_1, samp_0yng_tn_1, samp_3old_cold_1,
+                                              samp_3yng_cold_1, samp_14yng_cold_1,
+                                               samp_14old_cold_1,
+                                               samp_0old_tn_2, samp_0yng_tn_2,
+                                               samp_14yng_cold_2, samp_14old_cold_2,
+                                               samp_3yng_cold_2, samp_3old_cold_2)
+
+#following code worked, but problem is only stored 3000 variable genes - did not use the residual.features thing, so only took 3000 but also worked
+Data1 <- lapply(Data, function(x){
+  x <- NormalizeData(x)
+  x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+  return(x)
+})
+
+features <- SelectIntegrationFeatures(object.list = Data1)
+
+#Prepping for integration and integrating datasets
+anchors <- FindIntegrationAnchors(Data1, normalization.method = "LogNormalize", verbose = T, anchor.features = features, reduction = "cca")
+sn_Data <- IntegrateData(anchorset = anchors, normalization.method = "LogNormalize")
+
+DefaultAssay(sn_Data)<-"integrated"
+
+sn_Data1 <- sn_Data %>%
+  ScaleData(vars.to.regress = "mt.percent") %>%
+  RunPCA()
+
+sn_Data2 <- sn_Data1 %>%
+  RunUMAP(dims = 1:18, reduction = "pca", seed.use = 12) %>%
+  FindNeighbors(dims = 1:18, reduction = "pca") %>%
+  FindClusters(resolution = 0.4)
+DimPlot(sn_Data2, pt.size = 0.1, reduction = "umap")
+
+```
+###Processing Single Nuclei Dataset - Adipocyte Integration - RPCA
+```{r}
+#Using dblfinder to remove any found doublets in the datasets
+#http://127.0.0.1:31348/library/scDblFinder/doc/scDblFinder.html
+#The most common cause for an unexpectedly large proportion of doublets is if you have a multi-sample dataset and did not split by samples. scDblFinder will think that the data is a single capture with loads of cells, and hence with a very high doublet rate. Splitting by sample should solve the issue.
+
+#for multiple samples you may want to see states for each sample individually too
+#dbr argument, the expected doublet rate is first estimated using the empirical rule of thumb applicable to 10X data, namely roughly 1% per 1000 cells captures (so with 5000 cells, (0.01*5)*5000 = 250 doublets, and the more cells you capture the higher the chance of creating a doublet). If samples were specified, and if the dbr is automatically calculated, thresholding is performed separately across samples.
+
+#Thresholding then tries to simultaneously minimize: 1) the classification error (in terms of the proportion of known doublets below the threshold) and 2) the deviation from the expected number of doublets among real cells (as a ratio of the total number of expected doublets within the range determined by dbr.sd, and adjusted for homotypic doublets). This means that, if you have no idea about the doublet rate, setting dbr.sd=1 will make the threshold depend entirely on the misclassification rate. # Note however that different protocols may create considerably more doublets, and that this should be updated accordingly. If you have unsure about the doublet rate, you might consider increasing dbr.sd, so that it is estimated mostl/purely from the misclassification error.
+
+#to make this reproducible even when running under multithreading do the following
+sn.sce <- as.SingleCellExperiment(sn_Data2, assay = "RNA")
+sn.sce$clusters <- fastcluster(sn.sce) #If you ran scDblFinder on a multi-sample dataset and did not provide the cluster labels, then the labels are sample-specific (meaning that label ‘1’ in one sample might have nothing to do with label ‘1’ in another), and plotting them on a tSNE will look like they do not make sense. For this reason, when running multiple samples we recommend to first cluster all samples together (for example using sce$cluster <- fastcluster(sce)) and then provide the clusters to scDblFinder.
+#https://github.com/plger/scDblFinder
+scDbl_sn.sce <- scDblFinder(sn.sce, 
+                            samples = "orig.ident", #sample processed independently, as independent batches is where doublets arise and not the aggregeted biological samples itself
+#                            BPPARAM = bp,
+                            dbr = NULL, #Doublet rate. Assumed to be 1% per 1000. If you did not provide it (dbr argument), the doublet rate will be calculated automatically using expected doublet rates from 10x, meaning that the more cells captured, the higher the doublet rates. If you have reasons to think that this is not applicable to your data, set the dbr manually.
+                            dbr.sd = 1, #Note however that different protocols may create considerably more doublets, and that this should be updated accordingly. If you have unsure about the doublet rate, you might consider increasing dbr.sd, so that it is estimated most/purely from the misclassification error.
+                            clusters = F, #If your data is very clearly segregated into clusters, or if you are interested in the origin of the doublets, the cluster-based approach is preferable. This will also enable a more accurate accounting of homotypic doublets, and therefore a slightly better thresholding. Otherwise, and especially if your data does not segregate very clearly into clusters, the random approach (e.g. clusters=FALSE) is preferable. #could change to clusters = "clusters" if they do clearly seprate into clusters
+                            returnType = "full", multiSampleMode = "split", #split: the whole process is split by sample. This is the default and recommended mode, because it is the most robust (e.g. to heterogeneity between samples, also for instance in the number of cells), and in practice we have not seen major gains in sharing information across samples;
+                            knownUse = c("discard", "positive"))
+
+
+CCA_Data_1 <- as.Seurat(x = scDbl_sn.sce)
+table(CCA_Data_1$scDblFinder.class)
+
+CCA_Data_Singlets <- subset(CCA_Data_1, subset = scDblFinder.class == "singlet")
+
+DimPlot(sn_Data2, group.by = "orig.ident")&NoLegend()&NoAxes()&theme(text = element_blank())
+DimPlot(object = CCA_Data_Singlets, ncol = 3)&NoLegend()&NoAxes()
+
+Idents(CCA_Data_Singlets)<-CCA_Data_Singlets$seurat_clusters
+DimPlot(CCA_Data_Singlets, label = T)
+
+CCA_Data_Singlets <- RenameIdents(object = CCA_Data_Singlets,
+                                  "0" = "Adipocytes (Base)",
+                                  "1" = "Adipocytes (White)",
+                                  "2" = "Dpp4+ Fibroblasts",
+                                  "3" = "Icam1+ Preadipocytes",
+                                  "4" = "Icam1+ Preadipocytes",
+                                  "5" = "Immune Macrophages",
+                                  "6" = "Endothelial 1",
+                                  "7" = "Cd142+ Fibroblasts",
+                                  "8" = "Garbage",
+                                  "9" = "Immune Lymphocytes",
+                                  "10" = "Adipocytes (Beige)",
+                                  "11" = "Endothelial 2",
+                                  "12" = "SMCs/Pericytes",
+                                  "13" = "Desmosomes",
+                                  "14" = "Adherens junctions")
+
+#All clusters with less than 50 cells in total were excluding from further analysis
+CCA_Data_Singlets <- subset(x = CCA_Data_Singlets, idents = c(
+                                 "Adipocytes (Base)",
+                                 "Adipocytes (White)",
+                                 "Dpp4+ Fibroblasts",
+                                 "Icam1+ Preadipocytes",
+                                 "Icam1+ Preadipocytes",
+                                 "Immune Macrophages",
+                                 "Endothelial 1",
+                                 "Cd142+ Fibroblasts",
+                                 "Immune Lymphocytes",
+                                 "Adipocytes (Beige)",
+                                 "Endothelial 2",
+                                 "SMCs/Pericytes"))
+
+DimPlot(CCA_Data_Singlets, label = T, repel = T)&NoLegend()
+
+CCA_Data_Singlets$Named_clusters <- Idents(CCA_Data_Singlets)
+CCA_Data_Singlets$Named_clusters <- factor(x = CCA_Data_Singlets$Named_clusters,
+                                             levels = c("Adipocytes (White)",
+                                                        "Adipocytes (Base)",
+                                                        "Adipocytes (Beige)",
+                                                        "Dpp4+ Fibroblasts",
+                                                        "Icam1+ Preadipocytes",
+                                                        "Cd142+ Fibroblasts",
+                                                        "Endothelial 1",
+                                                        "Endothelial 2",
+                                                        "Immune Macrophages",
+                                                        "Immune Lymphocytes",
+                                                        "SMCs/Pericytes"))
+ 
+Idents(CCA_Data_Singlets)<- CCA_Data_Singlets$Named_clusters
+
+CCA_Data_Singlets$Exposure_Days <- factor(x = CCA_Data_Singlets$Exposure_Days,
+                                  levels = c("0_Days", "3_Days", "14_Days"))
+
+CCA_Data_Singlets$Temperature <- factor(x = CCA_Data_Singlets$Temperature,
+                                  levels = c("Thermoneutral", "Cold"))
+
+CCA_Data_Singlets@meta.data$RenamedReordered <- CCA_Data_Singlets@meta.data$Sample %>%
+  gsub(pattern = "Mm_ING_TN_young_03-1", replacement = "YTN") %>%
+  gsub(pattern = "Mm_ING_TN_young_05-1", replacement = "YTN") %>%
+  gsub(pattern = "Mm_ING_cold-03d_young_12-1", replacement = "Y3D") %>%
+  gsub(pattern = "Mm_ING_cold-03d_young_16-1", replacement = "Y3D") %>%
+  gsub(pattern = "Mm_ING_cold-14d_young_08-1", replacement = "Y14D") %>%
+  gsub(pattern = "Mm_ING_cold-14d_young_10-1", replacement = "Y14D") %>%
+  gsub(pattern = "Mm_ING_TN_old_01-1", replacement = "ATN") %>%
+  gsub(pattern = "Mm_ING_TN_old_04-1", replacement = "ATN") %>%
+  gsub(pattern = "Mm_ING_cold-03d_olD3-1", replacement = "A3D") %>%
+  gsub(pattern = "Mm_ING_cold-03d_olD4-1", replacement = "A3D") %>%
+  gsub(pattern = "Mm_ING_cold-14d_old_06-1", replacement = "A14D") %>%
+  gsub(pattern = "Mm_ING_cold-14d_old_08-1", replacement = "A14D") 
+
+#Changing order of levels so that the graphs have samples in correct orders
+CCA_Data_Singlets$RenamedReordered <- factor(x = CCA_Data_Singlets$RenamedReordered, 
+                                                  levels = c("YTN", "Y3D", "Y14D",
+                                                             "ATN", "A3D", "A14D"))
+
+CCA_Data_Singlets@meta.data$Species <- CCA_Data_Singlets@meta.data$RenamedReordered %>%
+  gsub(pattern = "ATN", replacement = "Mouse") %>%
+  gsub(pattern = "YTN", replacement = "Mouse") %>%
+  gsub(pattern = "A3D", replacement = "Mouse") %>%
+  gsub(pattern = "Y3D", replacement = "Mouse") %>%
+  gsub(pattern = "A14D", replacement = "Mouse") %>%
+  gsub(pattern = "Y14D", replacement = "Mouse")
+
+CCA_Data_Singlets@meta.data$Condition <- CCA_Data_Singlets@meta.data$RenamedReordered %>%
+  gsub(pattern = "YTN", replacement = "TN") %>%
+  gsub(pattern = "ATN", replacement = "TN") %>%
+  gsub(pattern = "Y3D", replacement = "3 Days") %>%
+  gsub(pattern = "A3D", replacement = "3 Days") %>%
+  gsub(pattern = "Y14D", replacement = "14 Days") %>%
+  gsub(pattern = "A14D", replacement = "14 Days")
+
+#Taking the adipocyte population and taking just those cells and performing and integration on them
+Adipocytes <- subset(x = CCA_Data_Singlets, idents = c("Adipocytes (White)", "Adipocytes (Base)", "Adipocytes (Beige)"))
+DimPlot(Adipocytes)
+Adipo_list <- SplitObject(Adipocytes, split.by = "Abbrev")
+
+lapply(Adipo_list, function(x){
+  DimPlot(x)&ggtitle(label = x$Abbrev)
+})
+
+YTN <- Adipo_list$YTN@assays$RNA@counts
+Y3D <- Adipo_list$Y3D@assays$RNA@counts
+Y14D <- Adipo_list$Y14D@assays$RNA@counts
+ATN <- Adipo_list$OTN@assays$RNA@counts
+A3D <- Adipo_list$O3D@assays$RNA@counts
+A14D <- Adipo_list$O14D@assays$RNA@counts
+
+Barcodes <- colnames(YTN)
+orig.ident <- "YTN"
+Age <- "Young"
+Exposure_Temp <- "Thermoneutral"
+Exposure_Days <- "0 days"
+Exposure_Type <- "Thermoneutral"
+Sample <- "Mm_ING_TN_young_03-1"
+
+YTNdf <- data.frame(Barcodes, orig.ident, Age, Exposure_Days, Exposure_Temp, Exposure_Type, Sample)
+YTNdf <- column_to_rownames(YTNdf, var = "Barcodes")
+
+YTN_obj <- CreateSeuratObject(counts = YTN, project = "YTN", meta.data = YTNdf, assay = "RNA")
+rm(YTNdf, YTN)
+
+
+Barcodes <- colnames(Y3D)
+orig.ident <- "Y3D"
+Age <- "Young"
+Exposure_Temp <- "Cold"
+Exposure_Days <- "3 days"
+Exposure_Type <- "Acute Cold"
+Sample <- "Mm_ING_cold-03d_young_16-1"
+
+Y3Ddf <- data.frame(Barcodes, orig.ident, Age, Exposure_Days, Exposure_Temp, Exposure_Type, Sample)
+Y3Ddf <- column_to_rownames(Y3Ddf, var = "Barcodes")
+
+Y3D_obj <- CreateSeuratObject(counts = Y3D, project = "Y3D", meta.data = Y3Ddf, assay = "RNA")
+rm(Y3Ddf, Y3D)
+
+
+Barcodes <- colnames(Y14D)
+orig.ident <- "Y14D"
+Age <- "Young"
+Exposure_Temp <- "Cold"
+Exposure_Days <- "14 days"
+Exposure_Type <- "Chronic Cold"
+Sample <- "Mm_ING_cold-14d_young_08-1"
+
+Y14Ddf <- data.frame(Barcodes, orig.ident, Age, Exposure_Days, Exposure_Temp, Exposure_Type, Sample)
+Y14Ddf <- column_to_rownames(Y14Ddf, var = "Barcodes")
+
+Y14D_obj <- CreateSeuratObject(counts = Y14D, project = "Y14D", meta.data = Y14Ddf, assay = "RNA")
+rm(Y14Ddf, Y14D)
+
+
+Barcodes <- colnames(ATN)
+orig.ident <- "ATN"
+Age <- "Aged"
+Exposure_Temp <- "Thermoneutral"
+Exposure_Days <- "0 days"
+Exposure_Type <- "Thermoneutral"
+Sample <- "Mm_ING_TN_old_01-1"
+
+ATNdf <- data.frame(Barcodes, orig.ident, Age, Exposure_Days, Exposure_Temp, Exposure_Type, Sample)
+ATNdf <- column_to_rownames(ATNdf, var = "Barcodes")
+
+ATN_obj <- CreateSeuratObject(counts = ATN, project = "ATN", meta.data = ATNdf, assay = "RNA")
+rm(ATNdf, ATN)
+
+
+Barcodes <- colnames(A3D)
+orig.ident <- "A3D"
+Age <- "Aged"
+Exposure_Temp <- "Cold"
+Exposure_Days <- "3 days"
+Exposure_Type <- "Acute Cold"
+Sample <- "Mm_ING_cold-03d_olD3-1"
+
+A3Ddf <- data.frame(Barcodes, orig.ident, Age, Exposure_Days, Exposure_Temp, Exposure_Type, Sample)
+A3Ddf <- column_to_rownames(A3Ddf, var = "Barcodes")
+
+A3D_obj <- CreateSeuratObject(counts = A3D, project = "A3D", meta.data = A3Ddf, assay = "RNA")
+rm(A3Ddf, A3D)
+
+
+Barcodes <- colnames(A14D)
+orig.ident <- "A14D"
+Age <- "Old"
+Exposure_Temp <- "Cold"
+Exposure_Days <- "14 days"
+Exposure_Type <- "Chronic Cold"
+Sample <- "Mm_ING_cold-14d_old_08-1"
+
+A14Ddf <- data.frame(Barcodes, orig.ident, Age, Exposure_Days, Exposure_Temp, Exposure_Type, Sample)
+A14Ddf <- column_to_rownames(A14Ddf, var = "Barcodes")
+
+A14D_obj <- CreateSeuratObject(counts = A14D, project = "A14D",  meta.data = A14Ddf, assay = "RNA")
+rm(A14Ddf, A14D, Age, Exposure_Days, Exposure_Temp, Exposure_Type, Sample, Barcodes, Adipo_list, Adipocytes, orig.ident)
+
+Idents(YTN_obj) <- YTN_obj$orig.ident
+Idents(Y3D_obj) <- Y3D_obj$orig.ident
+Idents(Y14D_obj) <- Y14D_obj$orig.ident
+Idents(ATN_obj) <- ATN_obj$orig.ident
+Idents(A3D_obj) <- A3D_obj$orig.ident
+Idents(A14D_obj) <- A14D_obj$orig.ident
+
+#Combining datasets together to just pass some percentage feature sets and subset them all
+MergedData <- merge(x = YTN_obj, y =  c(Y3D_obj, Y14D_obj, A3D_obj, ATN_obj, A14D_obj))
+MergedData <- PercentageFeatureSet(object = MergedData, pattern = "^mt-", col.name = "mt.percent")
+VlnPlot(MergedData, features = c("nCount_RNA", "nFeature_RNA", "mt.percent"))
+
+YTN_obj <- PercentageFeatureSet(object = YTN_obj, pattern = "^mt-", col.name = "mt.percent")
+Y3D_obj <- PercentageFeatureSet(object = Y3D_obj, pattern = "^mt-", col.name = "mt.percent")
+Y14D_obj <- PercentageFeatureSet(object = Y14D_obj, pattern = "^mt-", col.name = "mt.percent")
+ATN_obj <- PercentageFeatureSet(object = ATN_obj, pattern = "^mt-", col.name = "mt.percent")
+A3D_obj <- PercentageFeatureSet(object = A3D_obj, pattern = "^mt-", col.name = "mt.percent")
+A14D_obj <- PercentageFeatureSet(object = A14D_obj, pattern = "^mt-", col.name = "mt.percent")
+
+Data <- list(YTN_obj, Y3D_obj, Y14D_obj, ATN_obj, A3D_obj, A14D_obj)
+
+Data1 <- lapply(Data, function(x){
+  x <- NormalizeData(x)
+  x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+   return(x)
+})
+
+features <- SelectIntegrationFeatures(object.list = Data1)
+options(future.globals.maxSize = 8000 * 1024^2)
+
+Data1 <- lapply(Data1, function(x){
+  x <- ScaleData(x, features = features, vars.to.regress = c("mt.percent"))
+  x <- RunPCA(x, features = features)
+   return(x)
+})
+
+#Prepping for integration and integrating datasets
+anchors <- FindIntegrationAnchors(Data1, normalization.method = "LogNormalize", verbose = T, anchor.features = features, reduction = "rpca", k.anchor = 20)
+sn_Data <- IntegrateData(anchorset = anchors, normalization.method = "LogNormalize")
+
+DefaultAssay(sn_Data)<-"integrated"
+
+sn_Data1 <- sn_Data %>%
+  ScaleData(vars.to.regress = c("mt.percent")) %>%
+  RunPCA(seed.use = 42)
+
+ElbowPlot(sn_Data1, ndims = 50)
+
+sn_Data2 <- sn_Data1 %>%
+  RunUMAP(dims = 1:18, reduction = "pca", seed.use = 25) %>%
+  FindNeighbors(dims = 1:18, reduction = "pca") %>%
+  FindClusters(resolution = c(0.2))
+DimPlot(sn_Data2)
+
+DefaultAssay(sn_Data2)<-"RNA"
+
+```
+
+###Datasets - single-cell and single-nuclei
+```{r}
+#Datasets to read in
+sc_Final_iWAT_Analysis <- readRDS(file = "/home/coreyh/Documents/RYAN/Corey_Holman_Paper_Submission_Fall_2022/PaperSubmission/single_cell_objects/sc_Final_iWAT_Analysis.2.1.23.rds")
+SampSplitColors <- c("coral1", "darkolivegreen1", "steelblue1", "brown", "darkolivegreen", "blue3")
+colorlevels <- c("royalblue2", "red3", "limegreen", "darkgreen", "orange4", "orange", "hotpink", "mediumpurple1", "darkorchid3")
+
+sn_Final_iWAT_Analysis <- readRDS(file = "/home/coreyh/Documents/RYAN/Corey_Holman_Paper_Submission_Fall_2022/PaperSubmission/single_nuclei_objects/SingleNucleiRawData/Chromium-SC3Pv3/SeuratObjects/CCA_integration_Res0.4_Named.rds")
+colorlevels2 <- c("mediumspringgreen", "#4B2903", "royalblue2", "red3", "limegreen", "orange4", "orange", "mediumpurple1", "darkmagenta", "hotpink")
+
+sn_AdipoReintegrated_Final_iWAT_Analysis <- readRDS(file = "/home/coreyh/Documents/RYAN/Corey_Holman_Paper_Submission_Fall_2022/PaperSubmission/single_nuclei_objects/SingleNucleiRawData/Chromium-SC3Pv3/SeuratObjects/RPCA_integration_ADIPO_Res0.2_Named_v2.rds")
+colorlevels3 <- c("#F20E02", "#FE780B", "#1C9E03", "blue")
+
+DefaultAssay(sc_Final_iWAT_Analysis) <- "RNA"
+DefaultAssay(sn_Final_iWAT_Analysis) <- "RNA"
+DefaultAssay(sn_AdipoReintegrated_Final_iWAT_Analysis) <- "RNA"
+
+myPalette <- c(brewer.pal(9, "Set1"), brewer.pal(8, "Set2"))
+HeatmapCols <- c("#1C7AD9", "#4F97DF", "#69A6E2", "#A8CAE8", "#C8DCEB", "#E7EDEE", "#DBB8B8", "#CE8282", "#C86767", "#C14C4C", "#B41616")
+
+Idents(sn_Final_iWAT_Analysis) <- sn_Final_iWAT_Analysis$Named_clusters
+DimPlot(sn_Final_iWAT_Analysis)
+sn_Final_iWAT_Analysis <- RenameIdents(object = sn_Final_iWAT_Analysis,
+                                  "Adipocytes (Base)" = "Adipocytes",
+                                  "Adipocytes (White)" = "Adipocytes",
+                                  "Immune Lymphocytes" = "Immune 1",
+                                  "Immune Macrophages" = "Immune 2")
+DimPlot(sn_Final_iWAT_Analysis)
+sn_Final_iWAT_Analysis$Named_clusters <- Idents(sn_Final_iWAT_Analysis)
+sn_Final_iWAT_Analysis$Named_clusters <- factor(x = sn_Final_iWAT_Analysis$Named_clusters,
+                                             levels = c("Adipocytes",
+                                                        "Adipocytes (Beige)",
+                                                        "Dpp4+ Fibroblasts",
+                                                        "Icam1+ Preadipocytes",
+                                                        "Cd142+ Fibroblasts",
+                                                        "Endothelial 1",
+                                                        "Endothelial 2",
+                                                        "Immune 1",
+                                                        "Immune 2",
+                                                        "SMCs/Pericytes"))
+Idents(sn_Final_iWAT_Analysis) <- sn_Final_iWAT_Analysis$Named_clusters
+DimPlot(sn_Final_iWAT_Analysis)
+sn_Final_iWAT_Analysis$Age <- sn_Final_iWAT_Analysis$Age %>% gsub(pattern = "Old", replacement = "Aged")
+sn_Final_iWAT_Analysis$Age <- factor(sn_Final_iWAT_Analysis$Age, levels = c("Young", "Aged"))
+```
+
+###Figure 3 
+A-D
+```{r}
+setwd(dir = "/home/coreyh/Documents/RYAN/Corey_Holman_Paper_Submission_Fall_2022/FinalFigures/")
+
+#3A
+Idents(sc_Final_iWAT_Analysis) <- sc_Final_iWAT_Analysis$Named_clusters
+DimPlot(sc_Final_iWAT_Analysis, pt.size = 1, cols = colorlevels)
+DimPlot(sc_Final_iWAT_Analysis, pt.size = 1, cols = colorlevels)&NoLegend()
+
+#3B
+DimPlot(sc_Final_iWAT_Analysis, split.by = "orig.ident", pt.size = 1, ncol = 3, cols = colorlevels)
+DimPlot(sc_Final_iWAT_Analysis, split.by = "orig.ident", pt.size = 1, ncol = 3, cols = colorlevels)&NoLegend()
+
+#3C
+Genes <- c("Pdgfra", "Pdgfrb", "Dpp4", "Col15a1", "F3", "Spp1", "Pecam1", "Myh11", "Mpz", "Ptprc")
+
+VlnPlot(object = sc_Final_iWAT_Analysis, features = Genes, cols = colorlevels, stack = T, flip = T, pt.size = 0, fill.by = "ident", assay = "RNA", adjust = 1.5, add.noise = T)&theme(
+  axis.text.y = element_text(size = 15, angle = 360),
+  axis.text.x = element_text(size = 15, face = "plain", angle = 80))
+
+VlnPlot(object = sc_Final_iWAT_Analysis, features = Genes, cols = colorlevels, stack = T, flip = T, pt.size = 0, fill.by = "ident", assay = "RNA", adjust = 1.5, add.noise = T)&theme(
+  axis.text.y = element_text(size = 15, angle = 360))#,
+#  axis.text.x = element_text(size = 20, face = "plain", angle = 80))
+
+VlnPlot(object = sc_Final_iWAT_Analysis, features = Genes, cols = colorlevels, stack = T, flip = T, pt.size = 0, fill.by = "ident", assay = "RNA", adjust = 1.5, add.noise = T)&theme(
+  axis.text.y = element_text(size = 25, angle = 360),
+  axis.text.x = element_text(size = 25, face = "plain", angle = 80))
+
+Genes <- c("Cd34", "Pdgfra", "Dlk1", "Pecam1", "Ptprc", "Cd163", "Adgre1", "Lgals3", "Cd36", "Nfkb1", "Ccl6", "Cd38")
+VlnPlot(object = sc_Final_iWAT_Analysis, features = Genes, cols = c("azure2", "azure4"), stack = T, flip = T, pt.size = 0, fill.by = "ident", split.by = "Age", assay = "RNA", adjust = 1.5, add.noise = T)&theme(
+  axis.text.y = element_text(size = 20, angle = 360),
+  axis.text.x = element_text(size = 20, face = "plain", angle = 80))
+
+#----
+#Dittoheatmaps
+Cd142 <- FindMarkers(sc_Final_iWAT_Analysis, ident.1 = "Cd142+ Fibroblasts", logfc.threshold = 1, min.diff.pct = 0.1, only.pos = T) %>% arrange(p_val_adj) %>% rownames() %>% head(n=15)
+Dpp4 <- FindMarkers(sc_Final_iWAT_Analysis, ident.1 = "Dpp4+ Fibroblasts", logfc.threshold = 1, min.diff.pct = 0.1, only.pos = T) %>% arrange(p_val_adj) %>% rownames() %>% head(n=15)
+Icam1 <- FindMarkers(sc_Final_iWAT_Analysis, ident.1 = "Icam1+ Preadipocytes", logfc.threshold = 1, min.diff.pct = 0.1, only.pos = T) %>% arrange(p_val_adj) %>% rownames() %>% head(n=15)
+
+Dpp4_Heatmap_SC <- c(Dpp4)
+Dpp4_Cells <- WhichCells(object = sc_Final_iWAT_Analysis, idents = c("Dpp4+ Fibroblasts"))
+
+sc_Final_iWAT_Analysis$Dpp4 <- sc_Final_iWAT_Analysis@meta.data$Named_clusters %>%
+  gsub(pattern = "Cd142+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Icam1+ Preadipocytes", replacement = "") %>%
+  gsub(pattern = "Endothelial 1", replacement = "") %>%
+  gsub(pattern = "Endothelial 2", replacement = "") %>%
+  gsub(pattern = "SMCs/Pericytes", replacement = "") %>%
+  gsub(pattern = "Spp1+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Schwann cells", replacement = "") %>%
+  gsub(pattern = "Immune cells", replacement = "")
+
+Icam1_Heatmap_SC <- c(Icam1)
+Icam1_Cells <- WhichCells(object = sc_Final_iWAT_Analysis, idents = c("Icam1+ Preadipocytes"))
+
+sc_Final_iWAT_Analysis$Icam1 <- sc_Final_iWAT_Analysis@meta.data$Named_clusters %>%
+  gsub(pattern = "Dpp4+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Cd142+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Endothelial 1", replacement = "") %>%
+  gsub(pattern = "Endothelial 2", replacement = "") %>%
+  gsub(pattern = "SMCs/Pericytes", replacement = "") %>%
+  gsub(pattern = "Spp1+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Schwann cells", replacement = "") %>%
+  gsub(pattern = "Immune cells", replacement = "")
+
+Cd142_Heatmap_SC <- c(Cd142)
+Cd142_Cells <- WhichCells(object = sc_Final_iWAT_Analysis, idents = c("Cd142+ Fibroblasts"))
+
+sc_Final_iWAT_Analysis$Cd142 <- sc_Final_iWAT_Analysis@meta.data$Named_clusters %>%
+  gsub(pattern = "Dpp4+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Icam1+ Preadipocytes", replacement = "") %>%
+  gsub(pattern = "Endothelial 1", replacement = "") %>%
+  gsub(pattern = "Endothelial 2", replacement = "") %>%
+  gsub(pattern = "SMCs/Pericytes", replacement = "") %>%
+  gsub(pattern = "Spp1+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Schwann cells", replacement = "") %>%
+  gsub(pattern = "Immune cells", replacement = "")
+
+#-------------------------------------------------------All three groups
+table(sc_Final_iWAT_Analysis$Named_clusters)
+sc_Final_iWAT_Analysis$Clusters <- sc_Final_iWAT_Analysis@meta.data$Named_clusters %>%
+  gsub(pattern = "Endothelial 1", replacement = "") %>%
+  gsub(pattern = "Endothelial 2", replacement = "") %>%
+  gsub(pattern = "SMCs/Pericytes", replacement = "") %>%
+  gsub(pattern = "Spp1+ Fibroblasts", replacement = "") %>%
+  gsub(pattern = "Schwann cells", replacement = "") %>%
+  gsub(pattern = "Immune cells", replacement = "")
+
+table(sc_Final_iWAT_Analysis$Clusters)
+
+sc_Final_iWAT_Analysis$Clusters <- factor(sc_Final_iWAT_Analysis$Clusters,
+                                          levels = c("Dpp4+ Fibroblasts", "Icam1+ Preadipocytes", "Cd142+ Fibroblasts"))
+
+table(sc_Final_iWAT_Analysis$Clusters)
+length(Dpp4_Cells)
+length(Icam1_Cells)
+length(Cd142_Cells)
+
+#Figure 3 - top hits from each of the clusters ovearll - supplemental image
+dittoHeatmap(object = sc_Final_iWAT_Analysis, 
+             genes = c(Dpp4_Heatmap_SC, Icam1_Heatmap_SC, Cd142_Heatmap_SC), 
+             cells.use = c(Dpp4_Cells, Icam1_Cells, Cd142_Cells), 
+             order.by = c("Age"), 
+             annot.by = c("Age", "Condition", "Clusters"),
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "royalblue2", "red3", "limegreen"), 
+             scaled.to.max = F, 
+             cluster_rows = F, 
+             cluster_cols = F,
+            labels_row = as.expression(lapply(c(Dpp4_Heatmap_SC, Icam1_Heatmap_SC, Cd142_Heatmap_SC), function(x) bquote(italic(.(x))))),
+             heatmap.colors = HeatmapCols, fontsize_row = 17)
+
+
+#Young vs Old for the interesting populations -----------------------------------------------------------------------------------------
+#Dittoheatmaps
+YoungUp <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == c('Dpp4+ Fibroblasts', 'Icam1+ Preadipocytes','Cd142+ Fibroblasts') &
+                                                         sc_Final_iWAT_Analysis$Age == "Young"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == c('Dpp4+ Fibroblasts', 'Icam1+ Preadipocytes','Cd142+ Fibroblasts') &
+                                                         sc_Final_iWAT_Analysis$Age == "Aged"], only.pos = F, logfc.threshold = 0.1) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(15) %>% rownames()
+
+OldUp <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == c('Dpp4+ Fibroblasts', 'Icam1+ Preadipocytes','Cd142+ Fibroblasts') &
+                                                         sc_Final_iWAT_Analysis$Age == "Young"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == c('Dpp4+ Fibroblasts', 'Icam1+ Preadipocytes','Cd142+ Fibroblasts') &
+                                                         sc_Final_iWAT_Analysis$Age == "Aged"], only.pos = F, logfc.threshold = 0.1) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(15) %>% rownames()
+
+#Figure 3 D
+#pdf(file = "FinalFigures/Figure3_D_E.pdf", height = 14, width = 10)
+#Top Markers that are cluster defining #icam1 is red #cd142 is green #Dpp4 is blue
+dittoHeatmap(object = sc_Final_iWAT_Analysis,
+             genes = c(YoungUp, OldUp), 
+             cells.use = c(Dpp4_Cells, Icam1_Cells, Cd142_Cells), 
+             order.by = c("Age"), 
+             annot.by = c("Age", "Condition", "Clusters"),
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "royalblue2", "red3", "limegreen"), 
+             scaled.to.max = F, 
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(YoungUp, OldUp), function(x) bquote(italic(.(x))))),
+             heatmap.colors = HeatmapCols, fontsize_row = 17)
+
+
+#-----------------------------------------------------------------------------------------------------------------------------------
+
+#Finding top markers for each cluster and getting genes differentially expressed between young and Old
+#Top Markers that are differences between Old and Young for each group, OTN YTN O3D Y3D 
+sc_Final_iWAT_Analysis$Samples <- factor(sc_Final_iWAT_Analysis$orig.ident, levels = c("YTN", "ATN", "Y3D", "A3D", "Y14D", "A14D"))
+
+Dpp4_YTNvsOTN1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "ATN"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+
+Dpp4_YTNvsOTN2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "ATN"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+Dpp4_Y3DvsO3D1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A3D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Dpp4_Y3DvsO3D2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A3D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+
+Dpp4_Y14DvsO14D1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A14D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Dpp4_Y14DvsO14D2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Dpp4+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A14D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+#--------------------------------------------------------#
+
+Icam1_YTNvsOTN1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "ATN"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Icam1_YTNvsOTN2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "ATN"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+
+Icam1_Y3DvsO3D1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A3D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Icam1_Y3DvsO3D2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A3D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+Icam1_Y14DvsO14D1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A14D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Icam1_Y14DvsO14D2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Icam1+ Preadipocytes' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A14D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+#--------------------------------------------------------#
+
+Cd142_YTNvsOTN1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "ATN"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Cd142_YTNvsOTN2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "ATN"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+
+Cd142_Y3DvsO3D1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A3D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Cd142_Y3DvsO3D2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A3D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+
+Cd142_Y14DvsO14D1 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A14D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(desc(avg_log2FC)) %>% head(5) %>% rownames()
+Cd142_Y14DvsO14D2 <- FindMarkers(sc_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sc_Final_iWAT_Analysis)[sc_Final_iWAT_Analysis$Named_clusters == 'Cd142+ Fibroblasts' &
+                                                         sc_Final_iWAT_Analysis$orig.ident == "A14D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% dplyr::arrange(avg_log2FC) %>% head(5) %>% rownames()
+
+#DPP4
+dittoHeatmap(object = sc_Final_iWAT_Analysis, 
+             genes = c(Dpp4_YTNvsOTN1, Dpp4_YTNvsOTN2, Dpp4_Y3DvsO3D1, Dpp4_Y3DvsO3D2, Dpp4_Y14DvsO14D1, Dpp4_Y14DvsO14D2),
+             cells.use = c(Dpp4_Cells), 
+             order.by = c("Samples"),
+             annot.by = c("Age", "Condition", "Dpp4"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "royalblue2"), 
+             scaled.to.max = F, 
+             cluster_rows = F, 
+             cluster_cols = F, fontsize_row = 25,
+             labels_row = as.expression(lapply(c(Dpp4_YTNvsOTN1, Dpp4_YTNvsOTN2, Dpp4_Y3DvsO3D1, Dpp4_Y3DvsO3D2, Dpp4_Y14DvsO14D1, Dpp4_Y14DvsO14D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors = HeatmapCols)
+
+#Icam1
+dittoHeatmap(object = sc_Final_iWAT_Analysis, 
+             genes = c(Icam1_YTNvsOTN1, Icam1_YTNvsOTN2, Icam1_Y3DvsO3D1, Icam1_Y3DvsO3D2, Icam1_Y14DvsO14D1, Icam1_Y14DvsO14D2),
+             cells.use = c(Icam1_Cells), 
+             order.by = c("Samples"),
+             annot.by = c("Age", "Condition", "Icam1"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "red3"), 
+             scaled.to.max = F, 
+             cluster_rows = F, 
+             cluster_cols = F, fontsize_row = 25,
+             labels_row = as.expression(lapply(c(Icam1_YTNvsOTN1, Icam1_YTNvsOTN2, Icam1_Y3DvsO3D1, Icam1_Y3DvsO3D2, Icam1_Y14DvsO14D1, Icam1_Y14DvsO14D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors = HeatmapCols)
+
+#Cd142
+dittoHeatmap(object = sc_Final_iWAT_Analysis, 
+             genes = c(Cd142_YTNvsOTN1, Cd142_YTNvsOTN2, Cd142_Y3DvsO3D1, Cd142_Y3DvsO3D2, Cd142_Y14DvsO14D1, Cd142_Y14DvsO14D2),
+             cells.use = c(Cd142_Cells), 
+             order.by = c("Samples"),
+             annot.by = c("Age", "Condition", "Cd142"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "limegreen"), 
+             scaled.to.max = F, 
+             cluster_rows = F, 
+             cluster_cols = F, fontsize_row = 25,
+             labels_row = as.expression(lapply(c(Cd142_YTNvsOTN1, Cd142_YTNvsOTN2, Cd142_Y3DvsO3D1, Cd142_Y3DvsO3D2, Cd142_Y14DvsO14D1, Cd142_Y14DvsO14D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors = HeatmapCols)
+
+```
+
+###Figure 5 
+A-G
+```{r}
+#A
+DimPlot(sn_Final_iWAT_Analysis, pt.size = 1, cols = colorlevels2)
+
+#A1
+Idents(sn_Final_iWAT_Analysis) <- sn_Final_iWAT_Analysis$Named_clusters
+Genes <- c("Plin1", "Ucp1", "Pdgfra", "Pdgfrb", "Dpp4", "Col15a1", "F3", "Pecam1", "Ptprc", "Adgre1", "Myo1b")
+VlnPlot(sn_Final_iWAT_Analysis, features = Genes, stack = T, fill.by = "ident", flip = T, cols = colorlevels2)&theme(
+  axis.text.y = element_text(size = 15, angle = 360),
+  axis.text.x = element_text(size = 15, face = "plain", angle = 80))
+
+#old
+Genes <- c("Cd34", "Pdgfra", "Dlk1", "Pecam1", "Ptprc", "Cd163", "Adgre1", "Lgals3", "Cd36", "Nfkb1", "Ccl6", "Cd38")
+VlnPlot(sn_Final_iWAT_Analysis, features = Genes, stack = T, fill.by = "ident", flip = T, split.by = "Age", cols = c("azure2", "azure4"))&theme(
+  axis.text.y = element_text(size = 15, angle = 360),
+  axis.text.x = element_text(size = 15, face = "plain", angle = 80))
+
+#B - add split by
+DimPlot(sn_Final_iWAT_Analysis, pt.size = 1, cols = colorlevels2, split.by = "RenamedReordered", ncol = 3)&NoLegend()&theme(text = element_text(size = 20), axis.text.x = element_text(size = 12), axis.text.y = element_text(size = 12), axis.title.y.left = element_text(size = 15), axis.title.x.bottom = element_text(size = 15))
+
+#Single Nuc adjustments to meta data
+Idents(sn_AdipoReintegrated_Final_iWAT_Analysis) <- sn_AdipoReintegrated_Final_iWAT_Analysis$seurat_clusters
+sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident <- factor(sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident, levels = c("YTN", "Y3D", "Y14D", "OTN", "O3D", "O14D"))
+sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters <- sn_AdipoReintegrated_Final_iWAT_Analysis$seurat_clusters %>% 
+  gsub(pattern = "0", replacement = "DNL high") %>%
+  gsub(pattern = "1", replacement = "DNL low") %>%
+  gsub(pattern = "2", replacement = "White") %>%
+  gsub(pattern = "3", replacement = "Beige")
+Idents(sn_AdipoReintegrated_Final_iWAT_Analysis) <- sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters
+sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters <- factor(sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters, levels = c("White", "DNL low", "DNL high", "Beige"))
+Idents(sn_AdipoReintegrated_Final_iWAT_Analysis) <- sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters
+
+sn_AdipoReintegrated_Final_iWAT_Analysis$Condition <- sn_AdipoReintegrated_Final_iWAT_Analysis$Exposure_Days %>%
+  gsub(pattern = "0 days", replacement = "TN")
+sn_AdipoReintegrated_Final_iWAT_Analysis$Condition <- factor(sn_AdipoReintegrated_Final_iWAT_Analysis$Condition,
+                                                             levels = c("TN", "3 days", "14 days"))
+sn_AdipoReintegrated_Final_iWAT_Analysis$Age <- sn_AdipoReintegrated_Final_iWAT_Analysis$Age %>% 
+  gsub(pattern = "Old", replacement = "Aged")
+sn_AdipoReintegrated_Final_iWAT_Analysis$Age <- factor(sn_AdipoReintegrated_Final_iWAT_Analysis$Age,
+                                                             levels = c("Young", "Aged"))
+sn_AdipoReintegrated_Final_iWAT_Analysis$Groups <- sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident
+
+#C
+DimPlot(sn_AdipoReintegrated_Final_iWAT_Analysis, pt.size = 2, cols = colorlevels3)
+
+#D
+DimPlot(sn_AdipoReintegrated_Final_iWAT_Analysis, pt.size = 2, split.by = "orig.ident", ncol = 3, cols = colorlevels3)&NoLegend()
+
+#E - vln plots
+Genes <- c("Plin1", "Fabp4", "Npr3", "Car3", "Nnat", 
+           "Prr16", "Tshr", 
+           "Fgf14", "Ces1f", "Gsta3", 
+           "Fasn", "Acss2", "Acly", 
+           "Ppargc1a", "Esrrg", "Cidea", "Gk", "Acot11", "Ucp1")
+
+VlnPlot(sn_AdipoReintegrated_Final_iWAT_Analysis, features = Genes, stack = T, flip = T, assay = "RNA", cols = colorlevels3, fill.by = "ident", add.noise = T, adjust = 1)&theme(text = element_text(size = 20), axis.text.y.left = element_text(size = 20))
+
+#Age split
+Genes <- c("Cd34", "Pdgfra", "Dlk1", "Pecam1", "Ptprc", "Cd163", "Adgre1", "Lgals3", "Cd36", "Nfkb1", "Ccl6", "Cd38")
+VlnPlot(object = sn_Final_iWAT_Analysis, features = Genes, cols = c("azure2", "azure4"), stack = T, flip = T, pt.size = 0, split.by = "Age", fill.by = "ident", assay = "RNA", adjust = 1.5, add.noise = T)&theme(
+  axis.text.y = element_text(size = 15, angle = 360),
+  axis.text.x = element_text(size = 15, face = "plain", angle = 80))
+VlnPlot(object = sn_Final_iWAT_Analysis, features = Genes, cols = c("azure2", "azure4"), stack = T, flip = T, pt.size = 0, fill.by = "ident", split.by = "Age", assay = "RNA", adjust = 1.5, add.noise = T)&theme(
+  axis.text.y = element_text(size = 20, angle = 360),
+  axis.text.x = element_text(size = 20, face = "plain", angle = 80))
+VlnPlot(object = sn_Final_iWAT_Analysis, features = Genes, cols = c("azure2", "azure4"), stack = T, flip = T, pt.size = 0, fill.by = "ident", split.by = "Age", assay = "RNA", adjust = 1.5, add.noise = T)&theme(
+  axis.text.y = element_text(size = 25, angle = 360),
+  axis.text.x = element_text(size = 25, face = "plain", angle = 80))
+
+```
+
+###Figure 6 
+```{r}
+
+A <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis, ident.1 = "DNL high", logfc.threshold = 0.1, only.pos = T) %>% subset(p_val_adj < 0.01)
+Genes_High <- rownames(A) %>% head(10)
+
+B <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis, ident.1 = "DNL low", logfc.threshold = 0.1, only.pos = T) %>% subset(p_val_adj < 0.01)
+Genes_Low <- rownames(B) %>% head(10)
+
+C <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis, ident.1 = "White", min.pct = 0.5, min.diff.pct = 0.26, only.pos = T) %>% subset(p_val_adj < 0.01)
+Genes_Wh <- rownames(C) %>% head(10)
+
+D <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis, ident.1 = "Beige", min.pct = 0.5, min.diff.pct = 0.4, only.pos = T) %>% subset(p_val_adj < 0.01)
+Genes_Be <- rownames(D) %>% head(10)
+
+#6 A - heatmap DGE adipocytes
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis,
+             genes = c(Genes_Wh, Genes_High, Genes_Low, Genes_Be), 
+             order.by = c("Clusters"), 
+             annot.by = c("Age", "Condition", "Clusters"),
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", colorlevels3), 
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F, fontsize_row = 20,
+             labels_row = as.expression(lapply(c(Genes_Wh, Genes_High, Genes_Low, Genes_Be), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#3E1315"))(50))
+
+
+#Finding top markers for each cluster and getting genes differentially expressed between young and Old
+#Top Markers that are differences between Old and Young for each group, OTN YTN O3D Y3D 
+sn_AdipoReintegrated_Final_iWAT_Analysis$Samples <- factor(sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident, levels = c("YTN", "OTN", "Y3D", "O3D", "Y14D", "O14D"))
+
+Idents(sn_AdipoReintegrated_Final_iWAT_Analysis)<-sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters
+
+#--------------------------------------------------------#
+White_YTNvsOTN1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "OTN"], only.pos = T, logfc.threshold = 0.01, min.pct = 0.1) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+White_YTNvsOTN2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "OTN"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+
+White_Y3DvsO3D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O3D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+White_Y3DvsO3D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O3D"], only.pos = F)  %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+White_Y14DvsO14D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F, logfc.threshold = 0.05)  %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+White_Y14DvsO14D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == 'White' &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F, logfc.threshold = 0.05)  %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+
+#------------------------------------------------------------------------------------------------------------
+HighYTNvsOTN1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "OTN"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+
+HighYTNvsOTN2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "OTN"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+HighY3DvsO3D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O3D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+HighY3DvsO3D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O3D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+
+HighY14DvsO14D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(6)
+HighY14DvsO14D1 <- HighY14DvsO14D1[c(1:4,6),] %>% rownames()
+
+HighY14DvsO14D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+
+#---------------------------------------------------------------------------------------------
+
+LowYTNvsOTN1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "OTN"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+
+LowYTNvsOTN2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "YTN"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "OTN"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+LowY3DvsO3D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O3D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+LowY3DvsO3D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O3D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+
+LowY14DvsO14D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+LowY14DvsO14D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL low" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F) %>% subset(p_val_adj < 0.01) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+
+
+#----------------------------------------------------- sensible beige comparisons
+Beige_Y14DvsO14D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F, logfc.threshold = 0.05)  %>% subset(p_val_adj < 0.1) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+Beige_Y14DvsO14D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = F, logfc.threshold = 0.05)  %>% subset(p_val_adj < 0.1) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+Beige_Y3DvsY14D1 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "Y14D"], only.pos = F, logfc.threshold = 0.05)  %>% subset(p_val_adj < 0.1) %>% subset(avg_log2FC >0) %>% head(5) %>% rownames()
+Beige_Y3DvsY14D2 <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y3D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "Beige" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "Y14D"], only.pos = F, logfc.threshold = 0.05)  %>% subset(p_val_adj < 0.1) %>% subset(avg_log2FC <0) %>% head(5) %>% rownames()
+
+#---------------------------------------------------------------------------------------------------------
+
+White_cells <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = "White")
+High_cells <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = "DNL high")
+Low_cells <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = "DNL low")
+Beige_cells <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = "Beige")
+
+sn_AdipoReintegrated_Final_iWAT_Analysis$White <- sn_AdipoReintegrated_Final_iWAT_Analysis@meta.data$Clusters %>%
+  gsub(pattern = "DNL High", replacement = "") %>%
+  gsub(pattern = "DNL Low", replacement = "") %>%
+  gsub(pattern = "Beige", replacement = "")
+
+sn_AdipoReintegrated_Final_iWAT_Analysis$DNL_High <- sn_AdipoReintegrated_Final_iWAT_Analysis@meta.data$Clusters %>%
+  gsub(pattern = "DNL Low", replacement = "") %>%
+  gsub(pattern = "White", replacement = "") %>%
+  gsub(pattern = "Beige", replacement = "")
+
+sn_AdipoReintegrated_Final_iWAT_Analysis$DNL_Low <- sn_AdipoReintegrated_Final_iWAT_Analysis@meta.data$Clusters %>%
+  gsub(pattern = "DNL High", replacement = "") %>%
+  gsub(pattern = "White", replacement = "") %>%
+  gsub(pattern = "Beige", replacement = "")
+
+sn_AdipoReintegrated_Final_iWAT_Analysis$Beige <- sn_AdipoReintegrated_Final_iWAT_Analysis@meta.data$Clusters %>%
+  gsub(pattern = "DNL High", replacement = "") %>%
+  gsub(pattern = "DNL Low", replacement = "") %>%
+  gsub(pattern = "White", replacement = "")
+
+#----
+#White
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(White_YTNvsOTN1, White_YTNvsOTN2, White_Y3DvsO3D1, White_Y3DvsO3D2),
+             #, White_Y14DvsO14D1, White_Y14DvsO14D2 - dropped
+             cells.use = c(White_cells),
+             order.by = c("Samples"),
+             annot.by = c("Age", "Condition", "White"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "#F20E02"), 
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(White_YTNvsOTN1, White_YTNvsOTN2, White_Y3DvsO3D1, White_Y3DvsO3D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#F20E02"))(25), fontsize_row = 20)
+#----
+#High DNL - all
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(HighYTNvsOTN1, HighYTNvsOTN2, HighY3DvsO3D1, HighY3DvsO3D2, HighY14DvsO14D1, HighY14DvsO14D2),
+             cells.use = c(High_cells),
+             order.by = c("Samples"),
+             annot.by = c("Age", "Condition", "DNL_High"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "#1C9E03"),
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(HighYTNvsOTN1, HighYTNvsOTN2, HighY3DvsO3D1, HighY3DvsO3D2, HighY14DvsO14D1, HighY14DvsO14D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#1C9E03"))(25), fontsize_row = 25)
+
+
+sn_AdipoReintegrated_Final_iWAT_Analysis$TN <-sn_AdipoReintegrated_Final_iWAT_Analysis$Condition %>%
+  gsub(pattern = "3 days", replacement = "") %>%
+  gsub(pattern = "14 days", replacement = "")
+sn_AdipoReintegrated_Final_iWAT_Analysis$Day_3 <-sn_AdipoReintegrated_Final_iWAT_Analysis$Condition %>%
+  gsub(pattern = "TN", replacement = "") %>%
+  gsub(pattern = "14 days", replacement = "")
+sn_AdipoReintegrated_Final_iWAT_Analysis$Day_14 <-sn_AdipoReintegrated_Final_iWAT_Analysis$Condition %>%
+  gsub(pattern = "3 days", replacement = "") %>%
+  gsub(pattern = "TN", replacement = "")
+
+Idents(sn_AdipoReintegrated_Final_iWAT_Analysis)<-sn_AdipoReintegrated_Final_iWAT_Analysis$Condition
+TN <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = "TN")
+Day_3 <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = "3 days")
+Day_14 <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = "14 days")
+
+#YTN vs OTN
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(HighYTNvsOTN1, HighYTNvsOTN2),
+             cells.use = c(TN[TN%in% High_cells]),
+             order.by = c("Age"),
+             annot.by = c("Age", "TN", "DNL_High"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "#1C9E03"),
+             scaled.to.max = T,
+             main = c("YTN vs OTN"),
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(HighYTNvsOTN1, HighYTNvsOTN2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#1C9E03"))(25), fontsize_row = 25)
+#Y3D vs O3D
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(HighY3DvsO3D1, HighY3DvsO3D2),
+             cells.use = c(Day_3[Day_3 %in% High_cells]),
+             order.by = c("Age"),
+             annot.by = c("Age", "Day_3", "DNL_High"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "darkolivegreen1", "#1C9E03"),
+             scaled.to.max = T,
+             main = c("Y3D vs O3D"),
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(HighY3DvsO3D1, HighY3DvsO3D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#1C9E03"))(25), fontsize_row = 25)
+#Y14D vs O14D
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(HighY14DvsO14D1, HighY14DvsO14D2),
+             cells.use = c(Day_14[Day_14 %in% High_cells]),
+             order.by = c("Age"),
+             annot.by = c("Age", "Day_14", "DNL_High"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "steelblue1", "#1C9E03"),
+             scaled.to.max = T,
+             main = c("Y14D vs O14D"),
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(HighY14DvsO14D1, HighY14DvsO14D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#1C9E03"))(25), fontsize_row = 25)
+
+
+#Section 6 lipoegnic genes
+Lipogenesis <- c("Fasn", "Acly", "Acaca", "Acsl1", "Acss2", "Mlxipl", "Me1", "Scd1", "Thrsp", "Elovl6", "Elovl3")
+
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(Lipogenesis),
+             cells.use = c(High_cells),
+             order.by = c("Age"),
+             annot.by = c("Age", "Condition", "DNL_High"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "#1C9E03"),
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(Lipogenesis), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#1C9E03"))(25), fontsize_row = 25)
+
+#----
+#Low DNL
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(LowYTNvsOTN1, LowYTNvsOTN2, LowY3DvsO3D1, LowY3DvsO3D2),#, LowY14DvsO14D1, LowY14DvsO14D2),
+             cells.use = c(Low_cells),
+             order.by = c("Samples"),
+             annot.by = c("Age", "Condition", "DNL_Low"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "coral1", "darkolivegreen1", "steelblue1", "#FE780B"),
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F,
+             labels_row = as.expression(lapply(c(LowYTNvsOTN1, LowYTNvsOTN2, LowY3DvsO3D1, LowY3DvsO3D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "#FE780B"))(25), fontsize_row = 25)
+
+
+#----
+Idents(sn_AdipoReintegrated_Final_iWAT_Analysis)<-sn_AdipoReintegrated_Final_iWAT_Analysis$Condition
+Day3_Day14_cells <- WhichCells(object = sn_AdipoReintegrated_Final_iWAT_Analysis, idents = c("3 days", "14 days"))
+
+sn_AdipoReintegrated_Final_iWAT_Analysis$Condition <- sn_AdipoReintegrated_Final_iWAT_Analysis$Exposure_Days %>%
+  gsub(pattern = "0 days", replacement = "")
+sn_AdipoReintegrated_Final_iWAT_Analysis$Condition <- factor(sn_AdipoReintegrated_Final_iWAT_Analysis$Condition,
+                                                             levels = c("3 days", "14 days"))
+#all sample we want to show for beige
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(Beige_Y3DvsY14D1, Beige_Y3DvsY14D2,Beige_Y14DvsO14D1, Beige_Y14DvsO14D2), #dropped - Beige_YTNvsOTN1, Beige_YTNvsOTN2, Beige_Y3DvsO3D1, Beige_Y3DvsO3D2,
+             cells.use = c(Day3_Day14_cells[Day3_Day14_cells %in% Beige_cells]),
+             order.by = c("Samples"),
+             annot.by = c("Age", "Condition", "Beige"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "darkolivegreen1", "steelblue1", "blue"),
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F,
+             main = c("Y3DvsY14D top5 up and down, Y14DvsO14D top 5 up and down"),
+             labels_row = as.expression(lapply(c(Beige_Y3DvsY14D1, Beige_Y3DvsY14D2,Beige_Y14DvsO14D1, Beige_Y14DvsO14D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "blue"))(25), fontsize_row = 25)
+
+
+#Beige - YTN vs O14D
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(Beige_Y14DvsO14D1, Beige_Y14DvsO14D2), #dropped - Beige_YTNvsOTN1, Beige_YTNvsOTN2, Beige_Y3DvsO3D1, Beige_Y3DvsO3D2,
+             cells.use = c(Day_14[Day_14 %in% Beige_cells]),
+             order.by = c("Age"),
+             annot.by = c("Age", "Day_14", "Beige"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "steelblue1", "blue"),
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F, 
+             main = "Y14D vs O14D",
+             labels_row = as.expression(lapply(c(Beige_Y14DvsO14D1, Beige_Y14DvsO14D2), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "blue"))(25), fontsize_row = 25)
+
+
+#Section 6 lipoegnic genes
+dittoHeatmap(object = sn_AdipoReintegrated_Final_iWAT_Analysis, 
+             genes = c(Lipogenesis),
+             cells.use = c(Day3_Day14_cells[Day3_Day14_cells %in% Beige_cells]),
+             order.by = c("Age"),
+             annot.by = c("Age", "Condition", "Beige"), 
+             assay = "RNA",
+             annot.colors = c("azure2", "azure4", "darkolivegreen1", "steelblue1", "blue"),
+             scaled.to.max = T, 
+             cluster_rows = F, 
+             cluster_cols = F,
+             main = c("Y3DvsY14D LIPO, Y14DvsO14D LIPO"),
+             labels_row = as.expression(lapply(c(Lipogenesis), function(x) bquote(italic(.(x))))),
+             heatmap.colors.max.scaled =  colorRampPalette(c("snow", "blue"))(25), fontsize_row = 25)
+
+
+```
+
+###Average Expression Heatmaps
+```{r}
+table(sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters)
+
+White <- subset(x = sn_AdipoReintegrated_Final_iWAT_Analysis, subset = Clusters == "White")
+DNLlow <- subset(x = sn_AdipoReintegrated_Final_iWAT_Analysis, subset = Clusters == "DNL low")
+DNLhigh <- subset(x = sn_AdipoReintegrated_Final_iWAT_Analysis, subset = Clusters == "DNL high")
+Beige <- subset(x = sn_AdipoReintegrated_Final_iWAT_Analysis, subset = Clusters == "Beige")
+
+white_Obj_TN <- subset(x = White,  subset = Condition == "TN")
+white_Obj_TN_YNG <- subset(x = white_Obj_TN,  subset = Age == "Young")
+white_Obj_TN_AGED <- subset(x = white_Obj_TN,  subset = Age == "Aged")
+
+white_Obj_3D <- subset(x = White,  subset = Condition == "3 days")
+white_Obj_3D_YNG <- subset(x = white_Obj_3D,  subset = Age == "Young")
+white_Obj_3D_AGED <- subset(x = white_Obj_3D,  subset = Age == "Aged")
+
+white_Obj_14D <- subset(x = White,  subset = Condition == "14 days")
+white_Obj_14D_YNG <- subset(x = white_Obj_14D,  subset = Age == "Young")
+white_Obj_14D_AGED <- subset(x = white_Obj_14D,  subset = Age == "Aged")
+
+rm(White, white_Obj_TN, white_Obj_3D, white_Obj_14D)
+
+
+
+DNLlow_Obj_TN <- subset(x = DNLlow,  subset = Condition == "TN")
+DNLlow_Obj_TN_YNG <- subset(x = DNLlow_Obj_TN,  subset = Age == "Young")
+DNLlow_Obj_TN_AGED <- subset(x = DNLlow_Obj_TN,  subset = Age == "Aged")
+
+DNLlow_Obj_3D <- subset(x = DNLlow,  subset = Condition == "3 days")
+DNLlow_Obj_3D_YNG <- subset(x = DNLlow_Obj_3D,  subset = Age == "Young")
+DNLlow_Obj_3D_AGED <- subset(x = DNLlow_Obj_3D,  subset = Age == "Aged")
+
+DNLlow_Obj_14D <- subset(x = DNLlow,  subset = Condition == "14 days")
+DNLlow_Obj_14D_YNG <- subset(x = DNLlow_Obj_14D,  subset = Age == "Young")
+DNLlow_Obj_14D_AGED <- subset(x = DNLlow_Obj_14D,  subset = Age == "Aged")
+
+rm(DNLlow, DNLlow_Obj_TN, DNLlow_Obj_14D)
+
+
+
+DNLhigh_Obj_TN <- subset(x = DNLhigh,  subset = Condition == "TN")
+DNLhigh_Obj_TN_YNG <- subset(x = DNLhigh_Obj_TN,  subset = Age == "Young")
+DNLhigh_Obj_TN_AGED <- subset(x = DNLhigh_Obj_TN,  subset = Age == "Aged")
+
+DNLhigh_Obj_3D <- subset(x = DNLhigh,  subset = Condition == "3 days")
+DNLhigh_Obj_3D_YNG <- subset(x = DNLhigh_Obj_3D,  subset = Age == "Young")
+DNLhigh_Obj_3D_AGED <- subset(x = DNLhigh_Obj_3D,  subset = Age == "Aged")
+
+DNLhigh_Obj_14D <- subset(x = DNLhigh,  subset = Condition == "14 days")
+DNLhigh_Obj_14D_YNG <- subset(x = DNLhigh_Obj_14D,  subset = Age == "Young")
+DNLhigh_Obj_14D_AGED <- subset(x = DNLhigh_Obj_14D,  subset = Age == "Aged")
+
+rm(DNLhigh, DNLhigh_Obj_TN, DNLhigh_Obj_14D)
+
+
+Beige_Obj_TN <- subset(x = Beige,  subset = Condition == "TN")
+Beige_Obj_TN_YNG <- subset(x = Beige_Obj_TN,  subset = Age == "Young")
+Beige_Obj_TN_AGED <- subset(x = Beige_Obj_TN,  subset = Age == "Aged")
+
+Beige_Obj_3D <- subset(x = Beige,  subset = Condition == "3 days")
+Beige_Obj_3D_YNG <- subset(x = Beige_Obj_3D,  subset = Age == "Young")
+Beige_Obj_3D_AGED <- subset(x = Beige_Obj_3D,  subset = Age == "Aged")
+
+Beige_Obj_14D <- subset(x = Beige,  subset = Condition == "14 days")
+Beige_Obj_14D_YNG <- subset(x = Beige_Obj_14D,  subset = Age == "Young")
+Beige_Obj_14D_AGED <- subset(x = Beige_Obj_14D,  subset = Age == "Aged")
+
+rm(Beige, Beige_Obj_TN, Beige_Obj_3D, Beige_Obj_14D)
+
+Lipogenesis <- c("Acly", "Fasn", "Acaca",  "Acss2", "Me1", "Scd1", "Mlxipl", "Elovl6", "Elovl3", "Thrsp", "Acsl1")
+
+df_white_TN_YNG <- as.data.frame(AverageExpression(white_Obj_TN_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_white_TN_OLD <- as.data.frame(AverageExpression(white_Obj_TN_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_white_3D_YNG <- as.data.frame(AverageExpression(white_Obj_3D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_white_3D_OLD <- as.data.frame(AverageExpression(white_Obj_3D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_white_14D_YNG <- as.data.frame(AverageExpression(white_Obj_14D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_white_14D_OLD <- as.data.frame(AverageExpression(white_Obj_14D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_DNLlow_TN_YNG <- as.data.frame(AverageExpression(DNLlow_Obj_TN_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_DNLlow_TN_OLD <- as.data.frame(AverageExpression(DNLlow_Obj_TN_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_DNLlow_3D_YNG <- as.data.frame(AverageExpression(DNLlow_Obj_3D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_DNLlow_3D_OLD <- as.data.frame(AverageExpression(DNLlow_Obj_3D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_DNLlow_14D_YNG <- as.data.frame(AverageExpression(DNLlow_Obj_14D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_DNLlow_14D_OLD <- as.data.frame(AverageExpression(DNLlow_Obj_14D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_DNLhigh_TN_YNG <- as.data.frame(AverageExpression(DNLhigh_Obj_TN_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_DNLhigh_TN_OLD <- as.data.frame(AverageExpression(DNLhigh_Obj_TN_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_DNLhigh_3D_YNG <- as.data.frame(AverageExpression(DNLhigh_Obj_3D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_DNLhigh_3D_OLD <- as.data.frame(AverageExpression(DNLhigh_Obj_3D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_DNLhigh_14D_YNG <- as.data.frame(AverageExpression(DNLhigh_Obj_14D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_DNLhigh_14D_OLD <- as.data.frame(AverageExpression(DNLhigh_Obj_14D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+#df_Beige_TN_YNG <- as.data.frame(AverageExpression(Beige_Obj_TN_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+#df_Beige_TN_OLD <- as.data.frame(AverageExpression(Beige_Obj_TN_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_Beige_3D_YNG <- as.data.frame(AverageExpression(Beige_Obj_3D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_Beige_3D_OLD <- as.data.frame(AverageExpression(Beige_Obj_3D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+df_Beige_14D_YNG <- as.data.frame(AverageExpression(Beige_Obj_14D_YNG, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+df_Beige_14D_OLD <- as.data.frame(AverageExpression(Beige_Obj_14D_AGED, features = Lipogenesis, group.by = "Species", assays = "RNA"))
+
+colnames(df_white_TN_YNG) <- "White YTN"
+df_white_TN_YNG
+colnames(df_white_TN_OLD) <- "White ATN"
+df_white_TN_OLD
+colnames(df_white_3D_YNG) <- "White Y3D"
+df_white_3D_YNG
+colnames(df_white_3D_OLD) <- "White A3D"
+df_white_3D_OLD
+colnames(df_white_14D_YNG) <- "White Y14D"
+df_white_14D_YNG
+colnames(df_white_14D_OLD) <- "White A14D"
+df_white_14D_OLD
+
+colnames(df_DNLlow_TN_YNG) <- "DNL-low YTN"
+df_DNLlow_TN_YNG
+colnames(df_DNLlow_TN_OLD) <- "DNL-low ATN"
+df_DNLlow_TN_OLD
+colnames(df_DNLlow_3D_YNG) <- "DNL-low Y3D"
+df_DNLlow_3D_YNG
+colnames(df_DNLlow_3D_OLD) <- "DNL-low A3D"
+df_DNLlow_3D_OLD
+colnames(df_DNLlow_14D_YNG) <- "DNL-low Y14D"
+df_DNLlow_14D_YNG
+colnames(df_DNLlow_14D_OLD) <- "DNL-low A14D"
+df_DNLlow_14D_OLD
+
+colnames(df_DNLhigh_TN_YNG) <- "DNL-high YTN"
+df_DNLhigh_TN_YNG
+colnames(df_DNLhigh_TN_OLD) <- "DNL-high ATN"
+df_DNLhigh_TN_OLD
+colnames(df_DNLhigh_3D_YNG) <- "DNL-high Y3D"
+df_DNLhigh_TN_YNG
+colnames(df_DNLhigh_3D_OLD) <- "DNL-high A3D"
+df_DNLhigh_3D_OLD
+colnames(df_DNLhigh_14D_YNG) <- "DNL-high Y14D"
+df_DNLhigh_14D_YNG
+colnames(df_DNLhigh_14D_OLD) <- "DNL-high A14D"
+df_DNLhigh_14D_OLD
+
+colnames(df_Beige_TN_YNG) <- "Beige YTN"
+df_Beige_TN_YNG
+colnames(df_Beige_TN_OLD) <- "Beige ATN"
+df_Beige_TN_OLD
+colnames(df_Beige_3D_YNG) <- "Beige Y3D"
+df_Beige_3D_YNG
+colnames(df_Beige_3D_OLD) <- "Beige A3D"
+df_Beige_3D_OLD
+colnames(df_Beige_14D_YNG) <- "Beige Y14D"
+df_Beige_14D_YNG
+colnames(df_Beige_14D_OLD) <- "Beige A14D"
+df_Beige_14D_OLD
+
+
+test <- data.frame(df_white_TN_YNG, df_white_3D_YNG, df_white_14D_YNG, 
+                   df_white_TN_OLD, df_white_3D_OLD, df_white_14D_OLD,
+                   
+                   df_DNLlow_TN_YNG, df_DNLlow_3D_YNG, df_DNLlow_14D_YNG, 
+                   df_DNLlow_TN_OLD, df_DNLlow_3D_OLD,  df_DNLlow_14D_OLD,
+                   
+                   df_DNLhigh_TN_YNG, df_DNLhigh_3D_YNG, df_DNLhigh_14D_YNG, 
+                   df_DNLhigh_TN_OLD, df_DNLhigh_3D_OLD, df_DNLhigh_14D_OLD,
+                   
+                   df_Beige_3D_YNG, df_Beige_14D_YNG, df_Beige_14D_OLD)
+
+test <- data.frame(df_DNLhigh_TN_YNG, df_DNLhigh_3D_YNG, df_DNLhigh_14D_YNG, 
+                   df_DNLhigh_TN_OLD, df_DNLhigh_3D_OLD, df_DNLhigh_14D_OLD,
+                   
+                   df_Beige_3D_YNG, df_Beige_14D_YNG, df_Beige_14D_OLD)
+
+pheatmap(mat = test, 
+         scale = "row", 
+         display_numbers = F,
+         cellwidth = 45, cellheight = 30,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name =
+  "RdYlBu")))(100),
+         cluster_rows = F, 
+         cluster_cols = F, 
+         fontsize_row = 20, 
+         labels_row = as.expression(lapply(c(rownames(test)), function(x) bquote(italic(.(x))))),
+         fontsize_col = 15, angle_col = 45)
+
+pheatmap(mat = test, 
+         scale = "row", 
+         display_numbers = F,
+         gaps_col = c(6), cellwidth = 45, cellheight = 20,
+         color = colorRampPalette(rev(brewer.pal(n = 7, name =
+  "RdYlBu")))(100),
+         cluster_rows = F, 
+         cluster_cols = F, 
+         fontsize_row = 20, 
+         labels_row = as.expression(lapply(c(rownames(test)), function(x) bquote(italic(.(x))))),
+         fontsize_col = 15, angle_col = 45)
+
+pheatmap(mat = test, 
+         scale = "row", fontsize_number = 10,
+         gaps_col = c(6), cellwidth = 45, cellheight = 20,
+         display_numbers = T, 
+         color = colorRampPalette(rev(brewer.pal(n = 7, name =
+  "RdYlBu")))(100),
+         cluster_rows = F, 
+         cluster_cols = F, 
+         fontsize_row = 20, 
+         labels_row = as.expression(lapply(c(rownames(test)), function(x) bquote(italic(.(x))))),
+         fontsize_col = 15, angle_col = 45)
+
+```
+
+
+###Acly and Npr3 feature plots
+```{r}
+FeaturePlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Npr3", order = T, split.by = "orig.ident", pt.size = 1.5)
+FeaturePlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Acly", order = T, split.by = "orig.ident", pt.size = 1.5)
+FeaturePlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Ucp1", order = T, split.by = "orig.ident", pt.size = 1.5)
+
+FeaturePlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Npr3", order = T, pt.size = 1.5)
+VlnPlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Npr3", pt.size = 0, cols = colorlevels3)
+VlnPlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Npr3", pt.size = 0, split.by = "orig.ident", cols = SampSplitColors)
+
+FeaturePlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Acly", order = T, pt.size = 1.5)
+VlnPlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Acly", pt.size = 0, cols = colorlevels3)
+VlnPlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Acly", pt.size = 0, split.by = "orig.ident", cols = SampSplitColors)
+
+FeaturePlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Ucp1", order = T, pt.size = 1.5)
+VlnPlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Ucp1", pt.size = 0, cols = colorlevels3)
+VlnPlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = "Ucp1", pt.size = 0, split.by = "orig.ident", cols = SampSplitColors)
+
+FeaturePlot(object = sn_AdipoReintegrated_Final_iWAT_Analysis, features = c("Ucp1", "Acly"), blend = T, cols = c( "blue", "#1C9E03"), split.by = "Age", pt.size = 1, order = T)
+
+```
+
+####Figure 6 - gProfiler
+```{r}
+DNL_High_Hits_Y14D_O14D <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident== "Y14D"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Clusters == "DNL high" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$orig.ident == "O14D"], only.pos = T) %>% subset(p_val_adj < 0.01) %>% rownames()
+
+GO_react <- gost(query = list("Y14D vs O14D upregulated genes" = DNL_High_Hits_Y14D_O14D),
+     organism = "mmusculus", 
+     ordered_query = T, significant = T, user_threshold = 0.05,
+     exclude_iea = F, sources = c("REAC"),
+     correction_method = "g_SCS", 
+     domain_scope = "annotated", as_short_link = F)
+
+BarGraph_react <- GO_react$result[,c(11,3)] %>% head(6) %>% arrange(p_value)
+ggplot(BarGraph_react, aes(x = -log10(p_value), y = fct_rev(reorder(term_name, p_value))), col = "black") +
+  labs(x = expression("-log"[10]*" Pvalue"), y = "Reactome Pathways", title = "Ordered by Significance") +
+  geom_col(col = "black", fill = "black", width = 0.75, position = position_dodge(2.7)) & theme_classic()&theme(axis.text.y = element_text(size = 20, face = "bold", family = "serif"),
+                                                                                                                axis.text.x = element_text(size = 17, face = "italic", family = "serif"),
+                                                                                                                plot.title = element_text(size = 15, face = "italic", family = "serif"),
+                                                                                                                axis.title = element_text(size = 20, face = "plain", family = "serif"))
+
+
+GO_Wiki <- gost(query = list("Y14D vs O14D upregulated genes" = DNL_High_Hits_Y14D_O14D),
+     organism = "mmusculus", 
+     ordered_query = T, significant = T, user_threshold = 0.05,
+     exclude_iea = F, sources = c("WP"),
+     correction_method = "g_SCS", 
+     domain_scope = "annotated", as_short_link = F)
+BarGraph_wp <- GO_Wiki$result[,c(11,3)] %>% head(6) %>% arrange(p_value)
+ggplot(BarGraph_wp, aes(x = -log10(p_value), y = fct_rev(reorder(term_name, p_value))), col = "black") +
+  labs(x = expression("-log"[10]*" Pvalue"), y = "WikiPathways", title = "Ordered by Significance") +
+  geom_col(col = "black", fill = "black", width = 0.75, position = position_dodge(2.7)) & theme_classic()&theme(axis.text.y = element_text(size = 20, face = "bold", family = "serif"),
+                                                                                                                axis.text.x = element_text(size = 17, face = "italic", family = "serif"),
+                                                                                                                plot.title = element_text(size = 15, face = "italic", family = "serif"),
+                                                                                                                axis.title = element_text(size = 20, face = "plain", family = "serif"))
+
+
+GO_kegg <- gost(query = list("Y14D vs O14D upregulated genes" = DNL_High_Hits_Y14D_O14D),
+     organism = "mmusculus", 
+     ordered_query = T, significant = T, user_threshold = 0.05,
+     exclude_iea = F, sources = c("KEGG"),
+     correction_method = "g_SCS", 
+     domain_scope = "annotated", as_short_link = F)
+BarGraph_kegg <- GO_kegg$result[,c(11,3)] %>% head(6) %>% arrange(p_value)
+ggplot(BarGraph_kegg, aes(x = -log10(p_value), y = fct_rev(reorder(term_name, p_value))), col = "black") +
+  labs(x = expression("-log"[10]*" Pvalue"), y = "KEGG Pathways", title = "Ordered by Signficance") +
+  geom_col(col = "black", fill = "black", width = 0.75, position = position_dodge(2.7)) & theme_classic()&theme(axis.text.y = element_text(size = 20, face = "bold", family = "serif"),
+                                                                                                                axis.text.x = element_text(size = 17, face = "italic", family = "serif"),
+                                                                                                                plot.title = element_text(size = 15, face = "italic", family = "serif"),
+                                                                                                                axis.title = element_text(size = 20, face = "plain", family = "serif"))
+
+
+#Comparison betwen young and aged of the 14 day condition within all adipocytes
+# Adipose_YoungvsAged <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA, cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Age == "Young" & sn_AdipoReintegrated_Final_iWAT_Analysis$Condition == "14 days"], cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Age == "Aged" & sn_AdipoReintegrated_Final_iWAT_Analysis$Condition == "14 days"], only.pos = T) %>% subset(p_val_adj < 0.01)
+# Adipose_YoungvsAged$gene_name <- rownames(Adipose_YoungvsAged)
+# df <- inner_join(Adipose_YoungvsAged, y = Tx, "gene_name")
+
+#Checking just the old vs young comparison of all the groups in general
+YvO_allclusters <- FindMarkers(sn_AdipoReintegrated_Final_iWAT_Analysis@assays$RNA,
+                     cells.1 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Age == "Young" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$Condition == "14 days"],
+                     cells.2 = colnames(sn_AdipoReintegrated_Final_iWAT_Analysis)[sn_AdipoReintegrated_Final_iWAT_Analysis$Age == "Aged" &
+                                                         sn_AdipoReintegrated_Final_iWAT_Analysis$Condition == "14 days"], only.pos = T) %>% subset(p_val_adj < 0.01) %>% rownames()
+
+
+GO_YvO <- gost(query = list("Young vs Aged for 14 days condition" = YvO_allclusters),
+     organism = "mmusculus", 
+     ordered_query = T, significant = T, user_threshold = 0.05,
+     exclude_iea = F,
+     correction_method = "g_SCS", 
+     domain_scope = "annotated", 
+     as_short_link = T,
+#    as_short_link = F
+     )
+
+gostplot(gostres = GO_YvO, )
+
+BarGraph_react <- GO_react$result[,c(11,3)] %>% head(6) %>% arrange(p_value)
+ggplot(BarGraph_react, aes(x = -log10(p_value), y = fct_rev(reorder(term_name, p_value))), col = "black") +
+  labs(x = expression("-log"[10]*" Pvalue"), y = "Reactome Pathways", title = "Ordered by Significance") +
+  geom_col(col = "black", fill = "black", width = 0.75, position = position_dodge(2.7)) & theme_classic()&theme(axis.text.y = element_text(size = 20, face = "bold", family = "serif"),
+                                                                                                                axis.text.x = element_text(size = 17, face = "italic", family = "serif"),
+                                                                                                                plot.title = element_text(size = 15, face = "italic", family = "serif"),
+                                                                                                                axis.title = element_text(size = 20, face = "plain", family = "serif"))
+
+```
